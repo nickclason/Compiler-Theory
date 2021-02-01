@@ -1,0 +1,8 @@
+//
+// Created by Nick Clason on 2/1/21.
+//
+
+#ifndef COMPILER_THEORY_DEFINITIONS_H
+#define COMPILER_THEORY_DEFINITIONS_H
+
+#endif //COMPILER_THEORY_DEFINITIONS_H
