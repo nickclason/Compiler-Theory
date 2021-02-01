@@ -1,0 +1,44 @@
+#IncludeRegexLine: ^[ 	]*[#%][ 	]*(include|import)[ 	]*[<"]([^">]+)([">])
+
+#IncludeRegexScan: ^.*$
+
+#IncludeRegexComplain: ^$
+
+#IncludeRegexTransform: 
+
+/Users/nick/Documents/Compiler-Theory/include/Parser.h
+
+/Users/nick/Documents/Compiler-Theory/include/Scanner.h
+definitions.h
+/Users/nick/Documents/Compiler-Theory/include/definitions.h
+cstdio
+-
+map
+-
+
+/Users/nick/Documents/Compiler-Theory/include/definitions.h
+iostream
+-
+
+/Users/nick/Documents/Compiler-Theory/src/Parser.cpp
+../include/Parser.h
+/Users/nick/Documents/Compiler-Theory/include/Parser.h
+
+/Users/nick/Documents/Compiler-Theory/src/Scanner.cpp
+../include/definitions.h
+/Users/nick/Documents/Compiler-Theory/include/definitions.h
+../include/Scanner.h
+/Users/nick/Documents/Compiler-Theory/include/Scanner.h
+iostream
+-
+
+/Users/nick/Documents/Compiler-Theory/src/main.cpp
+../include/definitions.h
+/Users/nick/Documents/Compiler-Theory/include/definitions.h
+../include/Scanner.h
+/Users/nick/Documents/Compiler-Theory/include/Scanner.h
+../include/Parser.h
+/Users/nick/Documents/Compiler-Theory/include/Parser.h
+iostream
+-
+
