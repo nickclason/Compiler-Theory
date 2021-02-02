@@ -1,6 +1,7 @@
 file(REMOVE_RECURSE
   "CMakeFiles/Compiler_Theory.dir/src/Parser.cpp.o"
   "CMakeFiles/Compiler_Theory.dir/src/Scanner.cpp.o"
+  "CMakeFiles/Compiler_Theory.dir/src/SymbolTable.cpp.o"
   "CMakeFiles/Compiler_Theory.dir/src/main.cpp.o"
   "Compiler_Theory"
   "Compiler_Theory.pdb"

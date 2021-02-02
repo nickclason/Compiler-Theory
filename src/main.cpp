@@ -3,10 +3,20 @@
 //
 
 #include "../include/definitions.h"
-#include "../include/Scanner.h"
 #include "../include/Parser.h"
+#include "../include/Scanner.h"
+#include "../include/SymbolTable.h"
 
 #include <iostream>
+
+std::string GetFileName()
+{
+    std::string fileName;
+    std::cout << "Enter file name: ";
+    std::cin >> fileName;
+
+    return fileName;
+}
 
 void ScannerTest(std::string fileName)
 {
@@ -22,13 +32,22 @@ void ScannerTest(std::string fileName)
     }
 }
 
-int main() {
-    std::string fileName;
-    std::cout << "Enter file name: ";
-    std::cin >> fileName;
 
-    // Testing Scanner functionality
-    ScannerTest(fileName);
+void ParserTest(std::string fileName)
+{
+}
+
+int main() {
+    std::string fileName = GetFileName();
+    token_t* tokenPtr = new token_t();
+    Scanner* scannerPtr = new Scanner();
+    SymbolTable* symbolTablePtr = new SymbolTable();
+
+    // Initialize Scanner and get first token
+    scannerPtr->InitScanner(fileName);
+    tokenPtr = scannerPtr->GetToken();
+
+    Parser* p = new Parser(tokenPtr, scannerPtr, symbolTablePtr);
 
     return 0;
 }

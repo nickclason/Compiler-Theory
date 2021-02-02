@@ -205,6 +205,13 @@ int Scanner::ScanOneToken(FILE* filePtr, token_t* token)
                         nestedCount += 1;
                     }
                 }
+                else if (nextCh == EOF)
+                {
+                    // Not sure about this but if the block comment is never
+                    // closed the code just gets stuck in an infinite loop.
+                    //
+                    return T_UNKNOWN;
+                }
             }
 
             token->str = commentStr;

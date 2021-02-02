@@ -7,6 +7,14 @@
 #IncludeRegexTransform: 
 
 /Users/nick/Documents/Compiler-Theory/include/Parser.h
+../include/definitions.h
+/Users/nick/Documents/Compiler-Theory/include/definitions.h
+../include/Scanner.h
+/Users/nick/Documents/Compiler-Theory/include/Scanner.h
+../include/SymbolTable.h
+/Users/nick/Documents/Compiler-Theory/include/SymbolTable.h
+queue
+-
 
 /Users/nick/Documents/Compiler-Theory/include/Scanner.h
 definitions.h
@@ -14,6 +22,14 @@ definitions.h
 cstdio
 -
 map
+-
+
+/Users/nick/Documents/Compiler-Theory/include/SymbolTable.h
+map
+-
+string
+-
+vector
 -
 
 /Users/nick/Documents/Compiler-Theory/include/definitions.h
@@ -24,21 +40,7 @@ iostream
 ../include/Parser.h
 /Users/nick/Documents/Compiler-Theory/include/Parser.h
 
-/Users/nick/Documents/Compiler-Theory/src/Scanner.cpp
-../include/definitions.h
-/Users/nick/Documents/Compiler-Theory/include/definitions.h
-../include/Scanner.h
-/Users/nick/Documents/Compiler-Theory/include/Scanner.h
-iostream
--
-
-/Users/nick/Documents/Compiler-Theory/src/main.cpp
-../include/definitions.h
-/Users/nick/Documents/Compiler-Theory/include/definitions.h
-../include/Scanner.h
-/Users/nick/Documents/Compiler-Theory/include/Scanner.h
-../include/Parser.h
-/Users/nick/Documents/Compiler-Theory/include/Parser.h
-iostream
--
+/Users/nick/Documents/Compiler-Theory/src/SymbolTable.cpp
+../include/SymbolTable.h
+/Users/nick/Documents/Compiler-Theory/include/SymbolTable.h
 
