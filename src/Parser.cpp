@@ -29,6 +29,8 @@ Parser::~Parser() {
 
 void Parser::Program()
 {
+    // TODO: Start new scope
+
     if (!ProgramHeader())
     {
         ReportError("Program header expected"); // TODO: Change msg
@@ -39,12 +41,15 @@ void Parser::Program()
         ReportError("Program body expected"); // TODO: Change msg
     }
 
-    // TODO:
-    //      Treat leaving of the period as a warning and not an error.
-    //      May change this later
+    // TODO: Treat leaving of the period as a warning and not an error. May change later
     if (!ValidateToken(T_PERIOD))
     {
         ReportWarning("Expected '.' at the end of program"); // TODO: Change msg
+    }
+
+    if (ValidateToken(T_EOF))
+    {
+        // TODO: Exit scope
     }
     else
     {

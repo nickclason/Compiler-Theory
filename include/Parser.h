@@ -12,47 +12,46 @@
 #include <queue>
 
 class Parser {
-public:
-    token_t* token;
-    Scanner* scanner;
-    SymbolTable* symbolTable;
+    public:
+        token_t* token;
+        Scanner* scanner;
+        SymbolTable* symbolTable;
 
-    // Constructor & Destructor
-    Parser(token_t* tokenPtr, Scanner* scannerPtr, SymbolTable* symbolTablePtr);
-    ~Parser();
+        // Constructor & Destructor
+        Parser(token_t* tokenPtr, Scanner* scannerPtr, SymbolTable* symbolTablePtr);
+        ~Parser();
 
-private:
+    private:
 
-    std::string line;
+        std::string line;
 
-    // TODO:
-    //      Add to error functions as needed
-    std::queue<std::string> errors;
-    void DisplayAllErrors();
-    void ReportError(std::string errorMsg);
-    void ReportTokenError(std::string errorMsg);
-    void ReportExpectedTypeError(std::string errorMsg);
-    void ReportTypeCheckError(std::string errorMsg);
-    void ReportWarning(std::string warningMsg);
+        // TODO:
+        //      Add to error functions as needed
+        std::queue<std::string> errors;
+        void DisplayAllErrors();
+        void ReportError(std::string errorMsg);
+        void ReportTokenError(std::string errorMsg);
+        void ReportExpectedTypeError(std::string errorMsg);
+        void ReportTypeCheckError(std::string errorMsg);
+        void ReportWarning(std::string warningMsg);
 
 
-    void Program();
-    bool ProgramHeader();
-    bool ProgramBody();
-    bool ValidateToken(int tokenType);
-    bool IsIdentifier(std::string &ident);
+        void Program();
+        bool ProgramHeader();
+        bool ProgramBody();
+        bool ValidateToken(int tokenType);
+        bool IsIdentifier(std::string &ident);
 
-    bool IsDeclaration(bool &isProcedureDec);
-    bool IsProcedureDeclaration();
-    bool IsVariableDeclaration();
+        bool IsDeclaration(bool &isProcedureDec);
+        bool IsProcedureDeclaration();
+        bool IsVariableDeclaration();
 
-    bool IsStatement();
-    bool IsIfStatement();
-    bool IsLoopStatement();
-    bool IsReturnStatement();
-    bool IsAssignmentStatement();
-    bool IsProcedureCall();
-
+        bool IsStatement();
+        bool IsIfStatement();
+        bool IsLoopStatement();
+        bool IsReturnStatement();
+        bool IsAssignmentStatement();
+        bool IsProcedureCall();
 
 };
 

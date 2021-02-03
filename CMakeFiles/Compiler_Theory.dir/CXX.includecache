@@ -40,7 +40,29 @@ iostream
 ../include/Parser.h
 /Users/nick/Documents/Compiler-Theory/include/Parser.h
 
+/Users/nick/Documents/Compiler-Theory/src/Scanner.cpp
+../include/definitions.h
+/Users/nick/Documents/Compiler-Theory/include/definitions.h
+../include/Scanner.h
+/Users/nick/Documents/Compiler-Theory/include/Scanner.h
+iostream
+-
+
 /Users/nick/Documents/Compiler-Theory/src/SymbolTable.cpp
+../include/definitions.h
+/Users/nick/Documents/Compiler-Theory/include/definitions.h
 ../include/SymbolTable.h
 /Users/nick/Documents/Compiler-Theory/include/SymbolTable.h
+
+/Users/nick/Documents/Compiler-Theory/src/main.cpp
+../include/definitions.h
+/Users/nick/Documents/Compiler-Theory/include/definitions.h
+../include/Parser.h
+/Users/nick/Documents/Compiler-Theory/include/Parser.h
+../include/Scanner.h
+/Users/nick/Documents/Compiler-Theory/include/Scanner.h
+../include/SymbolTable.h
+/Users/nick/Documents/Compiler-Theory/include/SymbolTable.h
+iostream
+-
 

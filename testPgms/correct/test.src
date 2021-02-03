@@ -1,0 +1,9 @@
+program LoopFib is
+
+global variable x : integer;
+variable i : integer;
+variable max : integer;
+variable tmp : integer;
+variable out : bool;
+
+end program.

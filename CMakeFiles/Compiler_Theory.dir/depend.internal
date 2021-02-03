@@ -13,6 +13,7 @@ CMakeFiles/Compiler_Theory.dir/src/Scanner.cpp.o
  /Users/nick/Documents/Compiler-Theory/src/Scanner.cpp
 CMakeFiles/Compiler_Theory.dir/src/SymbolTable.cpp.o
  /Users/nick/Documents/Compiler-Theory/include/SymbolTable.h
+ /Users/nick/Documents/Compiler-Theory/include/definitions.h
  /Users/nick/Documents/Compiler-Theory/src/SymbolTable.cpp
 CMakeFiles/Compiler_Theory.dir/src/main.cpp.o
  /Users/nick/Documents/Compiler-Theory/include/Parser.h

@@ -72,6 +72,9 @@
 		<Unit filename="/Users/nick/Documents/Compiler-Theory/include/Scanner.h">
 			<Option target="Compiler_Theory"/>
 		</Unit>
+		<Unit filename="/Users/nick/Documents/Compiler-Theory/include/SymbolTable.h">
+			<Option target="Compiler_Theory"/>
+		</Unit>
 		<Unit filename="/Users/nick/Documents/Compiler-Theory/include/definitions.h">
 			<Option target="Compiler_Theory"/>
 		</Unit>
@@ -82,9 +85,6 @@
 			<Option target="Compiler_Theory"/>
 		</Unit>
 		<Unit filename="/Users/nick/Documents/Compiler-Theory/src/SymbolTable.cpp">
-			<Option target="Compiler_Theory"/>
-		</Unit>
-		<Unit filename="/Users/nick/Documents/Compiler-Theory/src/SymbolTable.h">
 			<Option target="Compiler_Theory"/>
 		</Unit>
 		<Unit filename="/Users/nick/Documents/Compiler-Theory/src/main.cpp">

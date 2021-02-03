@@ -12,6 +12,7 @@ CMakeFiles/Compiler_Theory.dir/src/Scanner.cpp.o: include/definitions.h
 CMakeFiles/Compiler_Theory.dir/src/Scanner.cpp.o: src/Scanner.cpp
 
 CMakeFiles/Compiler_Theory.dir/src/SymbolTable.cpp.o: include/SymbolTable.h
+CMakeFiles/Compiler_Theory.dir/src/SymbolTable.cpp.o: include/definitions.h
 CMakeFiles/Compiler_Theory.dir/src/SymbolTable.cpp.o: src/SymbolTable.cpp
 
 CMakeFiles/Compiler_Theory.dir/src/main.cpp.o: include/Parser.h
