@@ -5,20 +5,37 @@
 #include "../include/Parser.h"
 
 // TODO:
-//      Add error flag
-//      Error/Warning counters
+//      Add error flag          - Added
+//      Error/Warning counters  -
+//      resync???????           -
+//      warning/error count     -
 
 Parser::Parser(token_t *tokenPtr, Scanner *scannerPtr, SymbolTable* symbolTablePtr)
 {
-    token = tokenPtr;
+    token = tokenPtr; // TODO: Might be able to remove tokenPtr parameter with some future changes
     scanner = scannerPtr;
     symbolTable = symbolTablePtr;
+    errorFlag = false;
+    errorCount = 0;
+    warningCount = 0;
 
-    // TODO: Implement functionality as needed
     // Parsing Starts Here
     Program();
 
-    DisplayAllErrors();
+    char errorCh = (errorCount > 1 || errorCount == 0) ? 's' : '\0';
+    char warningCh = (warningCount > 1 || warningCount == 0) ? 's' : '\0';
+    printf("\nParsing Completed with %d error%c and %d warning%c", errorCount, errorCh, warningCount, warningCh);
+    if (!errors.empty())
+    {
+        DisplayAllErrors();
+    }
+
+    if (!errorFlag)
+    {
+        printf("\nDEBUG: Parse Successful. No serious errors");
+    }
+
+
 }
 
 Parser::~Parser() {
@@ -29,7 +46,8 @@ Parser::~Parser() {
 
 void Parser::Program()
 {
-    // TODO: Start new scope
+    // New Scope for program
+    symbolTable->AddScope();
 
     if (!ProgramHeader())
     {
@@ -42,14 +60,18 @@ void Parser::Program()
     }
 
     // TODO: Treat leaving of the period as a warning and not an error. May change later
+    token = scanner->GetToken();
     if (!ValidateToken(T_PERIOD))
     {
         ReportWarning("Expected '.' at the end of program"); // TODO: Change msg
     }
 
+    token = scanner->GetToken();
     if (ValidateToken(T_EOF))
     {
-        // TODO: Exit scope
+        // TODO: Exit scope, I dont think i really need to do anything explicitly to exit this scope?
+        //       We do have a ChangeScope() method if needed.
+        return;
     }
     else
     {
@@ -59,15 +81,14 @@ void Parser::Program()
 
 bool Parser::ProgramHeader()
 {
-    // TODO: Implement Method
-
+    // TODO: Rewrite/Cleanup/Optimize
+    token = scanner->GetToken();
     if (ValidateToken(T_PROGRAM))
     {
         std::string ident;
-
         if (IsIdentifier(ident))
         {
-            // TODO: some way to manage scope?
+            token = scanner->GetToken();
             if (ValidateToken(T_IS))
             {
                 return true;
@@ -90,34 +111,36 @@ bool Parser::ProgramHeader()
 
 bool Parser::ProgramBody()
 {
+    // TODO: Maybe do some resync stuff in here?
     bool isProcedureDec = false;
     while (true)
     {
         while (IsDeclaration(isProcedureDec))
         {
+            token = scanner->GetToken();
             if (isProcedureDec)
             {
-                if (!ValidateToken(T_SEMICOLON))
-                {
+                if (!ValidateToken(T_SEMICOLON)) {
                     // TODO: Warning or error? That is the question
                     ReportWarning("Expected ';' after procedure declaration");
                 }
-                else if (!ValidateToken(T_SEMICOLON))
-                {
-                    // TODO: Warning or error? That is the question
-                    //       ReportLineError?
-                    ReportError("Expected ';' after variable declaration");
-                }
             }
-
+            else if (!ValidateToken(T_SEMICOLON))
+            {
+                // TODO: Warning or error? That is the question
+                //       ReportLineError?
+                ReportError("Expected ';' after variable declaration");
+            }
         }
 
+        //token = scanner->GetToken();
         if (ValidateToken(T_BEGIN))
         {
             while (true)
             {
                 while (IsStatement())
                 {
+                    token = scanner->GetToken();
                     if (!ValidateToken(T_SEMICOLON))
                     {
                         ReportError("Expected ';' after expression in program body"); // TODO: Change msg
@@ -125,8 +148,10 @@ bool Parser::ProgramBody()
                 }
 
                 // Get end of program body
+                token = scanner->GetToken();
                 if (ValidateToken(T_END))
                 {
+                    token = scanner->GetToken();
                     if (ValidateToken(T_PROGRAM))
                     {
                         return true;
@@ -156,9 +181,9 @@ bool Parser::ProgramBody()
 bool Parser::ValidateToken(int tokenType)
 {
     // TODO:
-    //      Implement method
-
+    //      rewrite using a switch on token->type
     // Ignore comments
+
     while (token->type == T_COMMENT)
     {
         token = scanner->GetToken();
@@ -167,18 +192,16 @@ bool Parser::ValidateToken(int tokenType)
     if (token->type == tokenType)
     {
         line.append(" " + token->str);
-        token = scanner->GetToken();
         return true;
     }
     else if (token->type == T_UNKNOWN)
     {
         ReportError("Unknown Token Error: " + token->str); // TODO: Change msg
-        token = scanner->GetToken();
         return ValidateToken(tokenType);
     }
     else if (token->type == T_EOF)
     {
-        return false;
+        return false; // This is false because if the token type is EOF and we get here, it means we weren't expecting EOF
     }
 
     return false;
@@ -186,12 +209,9 @@ bool Parser::ValidateToken(int tokenType)
 
 void Parser::DisplayAllErrors()
 {
-    // TODO:
-    //      Implement method
-
     if (!errors.empty())
     {
-        std::cout << "\nErrors and Warnings\n" << std::endl;
+        std::cout << "\n\nErrors and Warnings" << std::endl;
     }
     else
     {
@@ -200,9 +220,10 @@ void Parser::DisplayAllErrors()
 
     while (!errors.empty())
     {
-        std::cout << errors.front() << "\n" << std::endl;
+        std::cout << "\t" << errors.front() << std::endl;
         errors.pop();
     }
+    std::cout << std::endl;
 
     return;
 }
@@ -213,6 +234,7 @@ void Parser::ReportError(std::string errorMsg)
     //      Implement method
     //      add more detailed info, line, line #, col #, etc.
     errors.push("Error: " + errorMsg);
+    errorCount++;
 }
 
 void Parser::ReportTokenError(std::string errorMsg)
@@ -242,14 +264,15 @@ void Parser::ReportWarning(std::string warningMsg)
     //      Implement method
     //      add more detailed info, line, line #, col #, etc.
     errors.push("Warning: " + warningMsg);
+    warningCount++;
 }
 
-bool Parser::IsIdentifier(std::string &ident) {
-    // TODO: Implement Method
-    std::string temp = token->str;
+bool Parser::IsIdentifier(std::string &ident)
+{
+    token = scanner->GetToken();
     if (ValidateToken(T_IDENTIFIER))
     {
-        ident = temp;
+        ident = token->str;
         return true;
     }
 
@@ -258,22 +281,28 @@ bool Parser::IsIdentifier(std::string &ident) {
 
 bool Parser::IsDeclaration(bool &isProcedureDec)
 {
-    // TODO: Need to store symbols somehow
     bool isGlobal;
+    std::string id;
+    int type;
+
+    token = scanner->GetToken();
     ValidateToken(T_GLOBAL) ? isGlobal = true : isGlobal = false;
 
     // TODO: Implement functionality
     if (IsProcedureDeclaration())
     {
-        // scope stuff
+        // add new scope? and symbol?
+        return true;
     }
-    else if (IsVariableDeclaration())
+    else if (IsVariableDeclaration(id, type, isGlobal))
     {
-        // scope stuff
+        symbolTable->AddSymbol(id, type, std::vector<Node>(), isGlobal);
+        return true;
     }
     else if (isGlobal)
     {
         ReportError("Bad Line. Expected either a valid procedure or variable declaration of 'global' keyword"); // TODO: Change msg
+        return false;
     }
 
     return false;
@@ -293,9 +322,94 @@ bool Parser::IsProcedureDeclaration()
     return false;
 }
 
-bool Parser::IsVariableDeclaration()
+bool Parser::IsVariableDeclaration(std::string &id, int &type, bool isGlobal)
 {
-    // TODO: Implement method
+    // TODO: Add array and enum? support
+
+    if (isGlobal)
+    {
+        token = scanner->GetToken();
+        if (ValidateToken(T_VARIABLE))
+        {
+            token = scanner->GetToken();
+            if (ValidateToken(T_IDENTIFIER))
+            {
+                id = token->str;
+                token = scanner->GetToken();
+                if (ValidateToken(T_COLON))
+                {
+                    token = scanner->GetToken();
+                    if (ValidateToken(T_INTEGER) ||
+                        ValidateToken(T_FLOAT) ||
+                        ValidateToken(T_BOOL) ||
+                        ValidateToken(T_STRING) ||
+                        ValidateToken(T_ENUM))
+                    {
+                        type = token->type;
+                        return true;
+                    }
+                    else
+                    {
+                        ReportError("TYPE expected after ':'");
+                    }
+                }
+                else
+                {
+                    ReportError("Expected ':' after identifier");
+                }
+            }
+            else
+            {
+                ReportError("Expected identifier after 'variable' keyword");
+            }
+        }
+        else
+        {
+            ReportError("Expected 'variable' keyword after global identifier");
+        }
+    }
+    else // i think this could be made else if(T_VARIABLE)
+    {
+        if (ValidateToken(T_VARIABLE))
+        {
+            token = scanner->GetToken();
+            if (ValidateToken(T_IDENTIFIER))
+            {
+                id = token->str;
+                token = scanner->GetToken();
+                if (ValidateToken(T_COLON))
+                {
+                    token = scanner->GetToken();
+                    if (ValidateToken(T_INTEGER) ||
+                        ValidateToken(T_FLOAT) ||
+                        ValidateToken(T_BOOL) ||
+                        ValidateToken(T_STRING) ||
+                        ValidateToken(T_ENUM))
+                    {
+                        type = token->type;
+                        return true;
+                    }
+                    else
+                    {
+                        ReportError("TYPE expected after ':'");
+                    }
+                }
+                else
+                {
+                    ReportError("Expected ':' after identifier");
+                }
+            }
+            else
+            {
+                ReportError("Expected identifier after 'variable' keyword");
+            }
+        }
+        else // Not a variable
+        {
+            return false;
+        }
+    }
+
     return false;
 }
 

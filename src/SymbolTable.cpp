@@ -57,6 +57,7 @@ bool SymbolTable::AddSymbol(std::string id, int type, std::vector<Node> args, bo
         {
             Node newNode;
             newNode.id = id;
+            newNode.size = 0;
             newNode.scope = currScope;
             newNode.isGlobal = isGlobal;
             newNode.type = type;

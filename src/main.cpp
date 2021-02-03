@@ -45,7 +45,7 @@ int main() {
 
     // Initialize Scanner and get first token
     scannerPtr->InitScanner(fileName);
-    tokenPtr = scannerPtr->GetToken();
+//    tokenPtr = scannerPtr->GetToken();
 
     Parser* p = new Parser(tokenPtr, scannerPtr, symbolTablePtr);
 

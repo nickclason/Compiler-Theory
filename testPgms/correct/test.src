@@ -1,9 +1,13 @@
 program LoopFib is
 
-global variable x : integer;
+global variable x : bool;
+global variable y : bool;
+global variable num : integer;
 variable i : integer;
 variable max : integer;
 variable tmp : integer;
 variable out : bool;
 
+begin
+// no period is a warning atm
 end program.

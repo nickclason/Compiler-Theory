@@ -23,11 +23,14 @@ class Parser {
 
     private:
 
+        int errorCount;
+        int warningCount;
+        bool errorFlag;
         std::string line;
+        std::queue<std::string> errors;
 
         // TODO:
         //      Add to error functions as needed
-        std::queue<std::string> errors;
         void DisplayAllErrors();
         void ReportError(std::string errorMsg);
         void ReportTokenError(std::string errorMsg);
@@ -44,7 +47,7 @@ class Parser {
 
         bool IsDeclaration(bool &isProcedureDec);
         bool IsProcedureDeclaration();
-        bool IsVariableDeclaration();
+        bool IsVariableDeclaration(std::string &id, int &type, bool isGlobal);
 
         bool IsStatement();
         bool IsIfStatement();
