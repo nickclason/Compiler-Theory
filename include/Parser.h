@@ -46,7 +46,7 @@ class Parser {
         bool IsIdentifier(std::string &ident);
 
         bool IsDeclaration(bool &isProcedureDec);
-        bool IsProcedureDeclaration();
+        bool IsProcedureDeclaration(std::string &id, int &type, bool isGlobal);
         bool IsVariableDeclaration(std::string &id, int &type, bool isGlobal);
 
         bool IsStatement();
@@ -55,6 +55,9 @@ class Parser {
         bool IsReturnStatement();
         bool IsAssignmentStatement();
         bool IsProcedureCall();
+        bool IsProcedureHeader(std::string &id, int &type, bool isGlobal);
+        bool IsProcedureBody();
+        bool TypeCheck();
 
 };
 

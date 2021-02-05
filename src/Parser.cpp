@@ -5,10 +5,8 @@
 #include "../include/Parser.h"
 
 // TODO:
-//      Add error flag          - Added
-//      Error/Warning counters  -
-//      resync???????           -
-//      warning/error count     -
+//      resync???????                   -
+//      Might need a larger error class -
 
 Parser::Parser(token_t *tokenPtr, Scanner *scannerPtr, SymbolTable* symbolTablePtr)
 {
@@ -181,9 +179,9 @@ bool Parser::ProgramBody()
 bool Parser::ValidateToken(int tokenType)
 {
     // TODO:
-    //      rewrite using a switch on token->type
-    // Ignore comments
+    //      rewrite using a switch on token->type. might not work actually
 
+    // Ignore comments
     while (token->type == T_COMMENT)
     {
         token = scanner->GetToken();
@@ -235,6 +233,7 @@ void Parser::ReportError(std::string errorMsg)
     //      add more detailed info, line, line #, col #, etc.
     errors.push("Error: " + errorMsg);
     errorCount++;
+    errorFlag = true;
 }
 
 void Parser::ReportTokenError(std::string errorMsg)
@@ -288,10 +287,9 @@ bool Parser::IsDeclaration(bool &isProcedureDec)
     token = scanner->GetToken();
     ValidateToken(T_GLOBAL) ? isGlobal = true : isGlobal = false;
 
-    // TODO: Implement functionality
-    if (IsProcedureDeclaration())
+    if (IsProcedureDeclaration(id, type, isGlobal))
     {
-        // add new scope? and symbol?
+        // TODO: add new scope? and symbol?
         return true;
     }
     else if (IsVariableDeclaration(id, type, isGlobal))
@@ -316,9 +314,16 @@ bool Parser::IsStatement()
     return false;
 }
 
-bool Parser::IsProcedureDeclaration()
+bool Parser::IsProcedureDeclaration(std::string &id, int &type, bool isGlobal)
 {
     // TODO: Implement method
+
+    if (IsProcedureHeader(id, type, isGlobal))
+    {
+        // temporary
+        return true;
+    }
+
     return false;
 }
 
@@ -339,11 +344,7 @@ bool Parser::IsVariableDeclaration(std::string &id, int &type, bool isGlobal)
                 if (ValidateToken(T_COLON))
                 {
                     token = scanner->GetToken();
-                    if (ValidateToken(T_INTEGER) ||
-                        ValidateToken(T_FLOAT) ||
-                        ValidateToken(T_BOOL) ||
-                        ValidateToken(T_STRING) ||
-                        ValidateToken(T_ENUM))
+                    if (TypeCheck())
                     {
                         type = token->type;
                         return true;
@@ -370,6 +371,7 @@ bool Parser::IsVariableDeclaration(std::string &id, int &type, bool isGlobal)
     }
     else // i think this could be made else if(T_VARIABLE)
     {
+        token = scanner->GetToken();
         if (ValidateToken(T_VARIABLE))
         {
             token = scanner->GetToken();
@@ -380,11 +382,7 @@ bool Parser::IsVariableDeclaration(std::string &id, int &type, bool isGlobal)
                 if (ValidateToken(T_COLON))
                 {
                     token = scanner->GetToken();
-                    if (ValidateToken(T_INTEGER) ||
-                        ValidateToken(T_FLOAT) ||
-                        ValidateToken(T_BOOL) ||
-                        ValidateToken(T_STRING) ||
-                        ValidateToken(T_ENUM))
+                    if (TypeCheck())
                     {
                         type = token->type;
                         return true;
@@ -440,5 +438,102 @@ bool Parser::IsAssignmentStatement()
 bool Parser::IsProcedureCall()
 {
     // TODO: Implement method
+    return false;
+}
+
+bool Parser::IsProcedureHeader(std::string &id, int &type, bool isGlobal)
+{
+    // TODO: Add error messages and fix all this
+    if (isGlobal)
+    {
+        token = scanner->GetToken();
+    }
+
+    if (ValidateToken(T_PROCEDURE))
+    {
+        // Add new scope for procedure
+        symbolTable->AddScope();
+        if (IsIdentifier(id))
+        {
+            token = scanner->GetToken();
+            if (ValidateToken(T_COLON))
+            {
+                token = scanner->GetToken();
+                if (TypeCheck())
+                {
+                    type = token->type;
+                    token = scanner->GetToken();
+                    if (ValidateToken(T_LPAREN))
+                    {
+                        token = scanner->GetToken();
+                        if (ValidateToken(T_RPAREN))
+                        {
+                            // No parameters
+                            symbolTable->AddSymbol(id, type, std::vector<Node>(), isGlobal);
+                            return true;
+                        }
+                        else if (ValidateToken(T_VARIABLE))
+                        {
+                            // TODO: I think there can only be 1 parameter per procedure, might need to change
+                            //       if this is not true
+
+                            //token = scanner->GetToken();
+                            std::string varId;
+                            if (IsIdentifier(varId))
+                            {
+                                token = scanner->GetToken();
+                                if (ValidateToken(T_COLON))
+                                {
+                                    token = scanner->GetToken();
+                                    if (TypeCheck())
+                                    {
+                                        int varType = token->type;
+                                        token = scanner->GetToken();
+                                        if (ValidateToken(T_RPAREN))
+                                        {
+                                            Node paramNode;
+                                            paramNode.id = varId;
+                                            paramNode.size = 0;
+                                            paramNode.isGlobal = false;
+                                            paramNode.type = varType;
+                                            paramNode.args = std::vector<Node>();
+
+                                            std::vector<Node> args;
+                                            args.push_back(paramNode);
+                                            symbolTable->AddSymbol(varId, type, args, isGlobal);
+
+                                            return true;
+                                        }
+
+                                    }
+                                }
+                            }
+
+                        }
+                        else
+                        {
+                            ReportError("Expected ')'"); // TODO: Change msg
+                        }
+                    }
+                }
+            }
+        }
+
+    }
+
+    return false;
+}
+
+bool Parser::TypeCheck()
+{
+    if (ValidateToken(T_INTEGER) ||
+        ValidateToken(T_FLOAT) ||
+        ValidateToken(T_BOOL) ||
+        ValidateToken(T_STRING) ||
+        ValidateToken(T_ENUM))
+    {
+        return true;
+    }
+
     return false;
 }
