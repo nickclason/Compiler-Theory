@@ -23,6 +23,7 @@ class Scanner
 
         bool InitScanner(std::string fileName);
         token_t* GetToken();
+        token_t* PeekToken();
 
     private:
         FILE* filePtr;

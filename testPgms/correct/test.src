@@ -1,8 +1,10 @@
 program LoopFib is
-
-procedure f : integer(variable x : integer)
+global variable x : integer;
+// this is a comment
+    procedure f : integer(variable x : integer)
         variable b : integer;
         variable y : integer;
+    begin
+    end procedure;
 begin
-// no period is a warning atm
 end program.

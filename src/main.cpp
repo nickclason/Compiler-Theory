@@ -32,12 +32,36 @@ void ScannerTest(std::string fileName)
     }
 }
 
+void PeekTest(std::string fileName)
+{
+    Scanner* s = new Scanner();
+    s->InitScanner(fileName);
+
+    token_t* token = new token_t();
+
+    int i = 1;
+    while (token->type != T_EOF)
+    {
+        if (i % 2 == 0)
+        {
+            token = s->PeekToken();
+        }
+        else
+        {
+            token = s->GetToken();
+        }
+
+        std::cout << "<" << token->type << ", " << token->str << ">, Line: " << token->line << " Col: " << token->col << std::endl;
+        i++;
+    }
+}
 
 void ParserTest(std::string fileName)
 {
 }
 
-int main() {
+int main()
+{
     std::string fileName = GetFileName();
     token_t* tokenPtr = new token_t();
     Scanner* scannerPtr = new Scanner();
@@ -45,9 +69,9 @@ int main() {
 
     // Initialize Scanner and get first token
     scannerPtr->InitScanner(fileName);
-//    tokenPtr = scannerPtr->GetToken();
 
     Parser* p = new Parser(tokenPtr, scannerPtr, symbolTablePtr);
+
 
     return 0;
 }

@@ -53,8 +53,8 @@ class Parser {
         bool IsIfStatement();
         bool IsLoopStatement();
         bool IsReturnStatement();
-        bool IsAssignmentStatement();
-        bool IsProcedureCall();
+        bool IsAssignmentStatement(std::string &id);
+        bool IsProcedureCall(std::string &id);
         bool IsProcedureHeader(std::string &id, int &type, bool isGlobal);
         bool IsProcedureBody();
         bool TypeCheck();

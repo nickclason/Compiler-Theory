@@ -8,6 +8,8 @@
 //      resync???????                   -
 //      Might need a larger error class -
 
+// TODO: Need to implement IsStatement methods now
+
 Parser::Parser(token_t *tokenPtr, Scanner *scannerPtr, SymbolTable* symbolTablePtr)
 {
     token = tokenPtr; // TODO: Might be able to remove tokenPtr parameter with some future changes
@@ -58,13 +60,13 @@ void Parser::Program()
     }
 
     // TODO: Treat leaving of the period as a warning and not an error. May change later
-    token = scanner->GetToken();
+//    token = scanner->GetToken();
     if (!ValidateToken(T_PERIOD))
     {
         ReportWarning("Expected '.' at the end of program"); // TODO: Change msg
     }
 
-    token = scanner->GetToken();
+//    token = scanner->GetToken();
     if (ValidateToken(T_EOF))
     {
         // TODO: Exit scope, I dont think i really need to do anything explicitly to exit this scope?
@@ -80,13 +82,13 @@ void Parser::Program()
 bool Parser::ProgramHeader()
 {
     // TODO: Rewrite/Cleanup/Optimize
-    token = scanner->GetToken();
+//    token = scanner->GetToken();
     if (ValidateToken(T_PROGRAM))
     {
         std::string ident;
         if (IsIdentifier(ident))
         {
-            token = scanner->GetToken();
+//            token = scanner->GetToken();
             if (ValidateToken(T_IS))
             {
                 return true;
@@ -115,7 +117,7 @@ bool Parser::ProgramBody()
     {
         while (IsDeclaration(isProcedureDec))
         {
-            token = scanner->GetToken();
+//            token = scanner->GetToken();
             if (isProcedureDec)
             {
                 if (!ValidateToken(T_SEMICOLON)) {
@@ -138,7 +140,7 @@ bool Parser::ProgramBody()
             {
                 while (IsStatement())
                 {
-                    token = scanner->GetToken();
+//                    token = scanner->GetToken();
                     if (!ValidateToken(T_SEMICOLON))
                     {
                         ReportError("Expected ';' after expression in program body"); // TODO: Change msg
@@ -146,10 +148,10 @@ bool Parser::ProgramBody()
                 }
 
                 // Get end of program body
-                token = scanner->GetToken();
+//                token = scanner->GetToken();
                 if (ValidateToken(T_END))
                 {
-                    token = scanner->GetToken();
+//                    token = scanner->GetToken();
                     if (ValidateToken(T_PROGRAM))
                     {
                         return true;
@@ -170,6 +172,7 @@ bool Parser::ProgramBody()
         else
         {
             // TODO: ReportFatalError?
+
             ReportError("Could not find another valid declaration or start of program execution"); // TODO: Change msg
             return false;
         }
@@ -178,26 +181,28 @@ bool Parser::ProgramBody()
 
 bool Parser::ValidateToken(int tokenType)
 {
-    // TODO:
-    //      rewrite using a switch on token->type. might not work actually
 
     // Ignore comments
-    while (token->type == T_COMMENT)
+    token_t* tempToken = scanner->PeekToken();
+    while (tempToken->type == T_COMMENT)
     {
         token = scanner->GetToken();
+        tempToken = scanner->PeekToken();
     }
 
-    if (token->type == tokenType)
+    if (tempToken->type == tokenType)
     {
+        token = scanner->GetToken();
         line.append(" " + token->str);
         return true;
     }
-    else if (token->type == T_UNKNOWN)
+    else if (tempToken->type == T_UNKNOWN)
     {
         ReportError("Unknown Token Error: " + token->str); // TODO: Change msg
-        return ValidateToken(tokenType);
+//        return ValidateToken(tokenType);
+        return false;
     }
-    else if (token->type == T_EOF)
+    else if (tempToken->type == T_EOF)
     {
         return false; // This is false because if the token type is EOF and we get here, it means we weren't expecting EOF
     }
@@ -268,7 +273,7 @@ void Parser::ReportWarning(std::string warningMsg)
 
 bool Parser::IsIdentifier(std::string &ident)
 {
-    token = scanner->GetToken();
+//    token = scanner->GetToken();
     if (ValidateToken(T_IDENTIFIER))
     {
         ident = token->str;
@@ -284,12 +289,11 @@ bool Parser::IsDeclaration(bool &isProcedureDec)
     std::string id;
     int type;
 
-    token = scanner->GetToken();
+//    token = scanner->GetToken();
     ValidateToken(T_GLOBAL) ? isGlobal = true : isGlobal = false;
 
     if (IsProcedureDeclaration(id, type, isGlobal))
     {
-        // TODO: add new scope? and symbol?
         return true;
     }
     else if (IsVariableDeclaration(id, type, isGlobal))
@@ -308,10 +312,13 @@ bool Parser::IsDeclaration(bool &isProcedureDec)
 
 bool Parser::IsStatement()
 {
-    // TODO: Implement method
-    //       ifStatement, loopStatement, returnStatement, assignment, procCall (all bool methods)
-
-    return false;
+    std::string id = "";
+    if (IsIfStatement()) return true;
+    else if (IsLoopStatement()) return true;
+    else if (IsReturnStatement()) return true;
+    else if (IsAssignmentStatement(id)) return true;
+    else if (IsProcedureCall(id)) return true;
+    else return false;
 }
 
 bool Parser::IsProcedureDeclaration(std::string &id, int &type, bool isGlobal)
@@ -320,8 +327,14 @@ bool Parser::IsProcedureDeclaration(std::string &id, int &type, bool isGlobal)
 
     if (IsProcedureHeader(id, type, isGlobal))
     {
-        // temporary
-        return true;
+        if (IsProcedureBody())
+        {
+            return true;
+        }
+        else
+        {
+            ReportError("Expected procedure body after procedure header"); // TODO: Change msg & make fatalerror
+        }
     }
 
     return false;
@@ -333,17 +346,17 @@ bool Parser::IsVariableDeclaration(std::string &id, int &type, bool isGlobal)
 
     if (isGlobal)
     {
-        token = scanner->GetToken();
+//        token = scanner->GetToken();
         if (ValidateToken(T_VARIABLE))
         {
-            token = scanner->GetToken();
+//            token = scanner->GetToken();
             if (ValidateToken(T_IDENTIFIER))
             {
                 id = token->str;
-                token = scanner->GetToken();
+//                token = scanner->GetToken();
                 if (ValidateToken(T_COLON))
                 {
-                    token = scanner->GetToken();
+//                    token = scanner->GetToken();
                     if (TypeCheck())
                     {
                         type = token->type;
@@ -371,17 +384,17 @@ bool Parser::IsVariableDeclaration(std::string &id, int &type, bool isGlobal)
     }
     else // i think this could be made else if(T_VARIABLE)
     {
-        token = scanner->GetToken();
+//        token = scanner->GetToken();
         if (ValidateToken(T_VARIABLE))
         {
-            token = scanner->GetToken();
+//            token = scanner->GetToken();
             if (ValidateToken(T_IDENTIFIER))
             {
                 id = token->str;
-                token = scanner->GetToken();
+//                token = scanner->GetToken();
                 if (ValidateToken(T_COLON))
                 {
-                    token = scanner->GetToken();
+//                    token = scanner->GetToken();
                     if (TypeCheck())
                     {
                         type = token->type;
@@ -429,13 +442,13 @@ bool Parser::IsReturnStatement()
     return false;
 }
 
-bool Parser::IsAssignmentStatement()
+bool Parser::IsAssignmentStatement(std::string &id)
 {
     // TODO: Implement method
     return false;
 }
 
-bool Parser::IsProcedureCall()
+bool Parser::IsProcedureCall(std::string &id)
 {
     // TODO: Implement method
     return false;
@@ -444,10 +457,6 @@ bool Parser::IsProcedureCall()
 bool Parser::IsProcedureHeader(std::string &id, int &type, bool isGlobal)
 {
     // TODO: Add error messages and fix all this
-    if (isGlobal)
-    {
-        token = scanner->GetToken();
-    }
 
     if (ValidateToken(T_PROCEDURE))
     {
@@ -455,17 +464,17 @@ bool Parser::IsProcedureHeader(std::string &id, int &type, bool isGlobal)
         symbolTable->AddScope();
         if (IsIdentifier(id))
         {
-            token = scanner->GetToken();
+//            token = scanner->GetToken();
             if (ValidateToken(T_COLON))
             {
-                token = scanner->GetToken();
+//                token = scanner->GetToken();
                 if (TypeCheck())
                 {
                     type = token->type;
-                    token = scanner->GetToken();
+//                    token = scanner->GetToken();
                     if (ValidateToken(T_LPAREN))
                     {
-                        token = scanner->GetToken();
+//                        token = scanner->GetToken();
                         if (ValidateToken(T_RPAREN))
                         {
                             // No parameters
@@ -481,14 +490,14 @@ bool Parser::IsProcedureHeader(std::string &id, int &type, bool isGlobal)
                             std::string varId;
                             if (IsIdentifier(varId))
                             {
-                                token = scanner->GetToken();
+//                                token = scanner->GetToken();
                                 if (ValidateToken(T_COLON))
                                 {
-                                    token = scanner->GetToken();
+//                                    token = scanner->GetToken();
                                     if (TypeCheck())
                                     {
                                         int varType = token->type;
-                                        token = scanner->GetToken();
+//                                        token = scanner->GetToken();
                                         if (ValidateToken(T_RPAREN))
                                         {
                                             Node paramNode;
@@ -500,13 +509,28 @@ bool Parser::IsProcedureHeader(std::string &id, int &type, bool isGlobal)
 
                                             std::vector<Node> args;
                                             args.push_back(paramNode);
-                                            symbolTable->AddSymbol(varId, type, args, isGlobal);
+                                            symbolTable->AddSymbol(id, type, args, isGlobal);
 
                                             return true;
                                         }
-
+                                        else
+                                        {
+                                            ReportError("Expected ')'");
+                                        }
+                                    }
+                                    else
+                                    {
+                                        ReportError("Type Expected: Missing or invalid type"); // TODO: Change msg
                                     }
                                 }
+                                else
+                                {
+                                    ReportError("Expected ':' after identifier");
+                                }
+                            }
+                            else
+                            {
+                                ReportError("Expected identifier after 'variable' keyword");
                             }
 
                         }
@@ -515,13 +539,94 @@ bool Parser::IsProcedureHeader(std::string &id, int &type, bool isGlobal)
                             ReportError("Expected ')'"); // TODO: Change msg
                         }
                     }
+                    else
+                    {
+                        ReportError("Expected ')'"); // TODO: Change msg
+                    }
+                }
+                else
+                {
+                    ReportError("Expected type");
                 }
             }
+            else
+            {
+                ReportError("Expected ':' after identifier");
+            }
+        }
+        else
+        {
+            ReportError("Identifier expected after 'procedure' keyword");
         }
 
     }
 
     return false;
+}
+
+bool Parser::IsProcedureBody()
+{
+    bool isProcDeclaration = false;
+
+    while (true)
+    {
+        while (IsDeclaration(isProcDeclaration))
+        {
+//            token = scanner->GetToken();
+            if (isProcDeclaration)
+            {
+                if (!ValidateToken(T_SEMICOLON))
+                {
+                    ReportError("Expected ';' after procedure declaration");
+                }
+            }
+            else if (!ValidateToken(T_SEMICOLON))
+            {
+                ReportError("Expected ';' after variable declaration");
+            }
+        }
+
+        // token = scanner->GetToken();
+        if (ValidateToken(T_BEGIN))
+        {
+            while (true)
+            {
+                while (IsStatement())
+                {
+//                    token = scanner->GetToken();
+                    if (!ValidateToken(T_SEMICOLON))
+                    {
+                        ReportError("Expected ';' after statement in procedure");
+                    }
+                }
+
+//                token = scanner->GetToken();
+                if (ValidateToken(T_END))
+                {
+//                    token = scanner->GetToken();
+                    if (ValidateToken(T_PROCEDURE))
+                    {
+                        return true;
+                    }
+                    else
+                    {
+                        ReportError("Expected 'end procedure' at end of procedure declaration"); // TODO: Change msg
+                        return true; // TODO: Treat this as a warning?
+                    }
+                }
+                else
+                {
+                    ReportError("Expected 'end procedure' at the end of procedure declaration");
+                    return false;
+                }
+            }
+        }
+        else
+        {
+            ReportError("Could not find valid declaration or 'begin' keyword in procedure body"); // TODO: Modify
+            return false;
+        }
+    }
 }
 
 bool Parser::TypeCheck()

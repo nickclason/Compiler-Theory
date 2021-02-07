@@ -514,3 +514,26 @@ void Scanner::UndoScan(char c)
     colCount--;
     ungetc(c, filePtr);
 }
+
+token_t* Scanner::PeekToken()
+{
+    token_t* newToken = new token_t();
+
+    // get starting position of the FILE*
+    fpos_t pos;
+    fgetpos(filePtr, &pos);
+
+    int prevLineCount = lineCount;
+    int prevColCount = colCount;
+
+    newToken->type = ScanOneToken(filePtr, newToken);
+    newToken->line = lineCount;
+    newToken->col = colCount;
+
+    // reset position
+    fsetpos(filePtr, &pos);
+    lineCount = prevLineCount;
+    colCount = prevColCount;
+
+    return newToken;
+}
