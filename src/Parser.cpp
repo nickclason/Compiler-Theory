@@ -8,7 +8,6 @@
 //      resync???????                   -
 //      Might need a larger error class -
 
-// TODO: Need to implement IsStatement methods now
 
 Parser::Parser(token_t *tokenPtr, Scanner *scannerPtr, SymbolTable* symbolTablePtr)
 {
@@ -444,8 +443,40 @@ bool Parser::IsReturnStatement()
 
 bool Parser::IsAssignmentStatement(std::string &id)
 {
-    // TODO: Implement method
-    return false;
+    Node n;
+    int size, type, checkSize, checkType;
+    bool isFound;
+    bool isGlobal;
+    bool isValidAssignment = IsValidAssignment(id, isFound, isGlobal, n, checkSize, checkType);
+
+    if (!isValidAssignment)
+    {
+        return false;
+    }
+
+    if (ValidateToken(T_ASSIGNMENT))
+    {
+        IsExpression(size, type);
+        if (isFound)
+        {
+            if (size != checkSize && (size > 1) && (checkSize <= 1))
+            {
+                ReportError("Invalid assignment, size of expression must match destination size"); // todo: msg
+            }
+            if ((type != checkType) && ((!IsNumber(type)) || (!IsNumber(checkType))))
+            {
+                ReportError("Invalid assignment, type of expression must match destination type"); // todo: msg
+            }
+
+        }
+
+        return true;
+    }
+    else
+    {
+        ReportError("Expected ':=' after '" + id + "' in assignment statement");
+        return true; // TODO: Not sure about this
+    }
 }
 
 bool Parser::IsProcedureCall(std::string &id)
@@ -572,7 +603,6 @@ bool Parser::IsProcedureBody()
     {
         while (IsDeclaration(isProcDeclaration))
         {
-//            token = scanner->GetToken();
             if (isProcDeclaration)
             {
                 if (!ValidateToken(T_SEMICOLON))
@@ -586,24 +616,20 @@ bool Parser::IsProcedureBody()
             }
         }
 
-        // token = scanner->GetToken();
         if (ValidateToken(T_BEGIN))
         {
             while (true)
             {
                 while (IsStatement())
                 {
-//                    token = scanner->GetToken();
                     if (!ValidateToken(T_SEMICOLON))
                     {
                         ReportError("Expected ';' after statement in procedure");
                     }
                 }
 
-//                token = scanner->GetToken();
                 if (ValidateToken(T_END))
                 {
-//                    token = scanner->GetToken();
                     if (ValidateToken(T_PROCEDURE))
                     {
                         return true;
@@ -636,6 +662,463 @@ bool Parser::TypeCheck()
         ValidateToken(T_BOOL) ||
         ValidateToken(T_STRING) ||
         ValidateToken(T_ENUM))
+    {
+        return true;
+    }
+
+    return false;
+}
+
+bool Parser::IsValidAssignment(std::string &id, bool &isFound, bool &isGlobal, Node &n, int &checkSize, int &checkType)
+{
+    int size, type;
+
+    if (IsIdentifier(id))
+    {
+        isFound = symbolTable->DoesSymbolExist(id, isGlobal, n);
+        if (isFound && n.type == T_PROCEDURE)
+        {
+            return false;
+        }
+        else if (!isFound)
+        {
+            checkSize = 0;
+            checkType = T_UNKNOWN;
+            ReportError(id + " was not declared in this scope");
+        }
+        else
+        {
+            checkSize = n.size;
+            checkType = n.type;
+        }
+
+        // TODO: Arrays
+//        if (ValidateToken(T_LBRACKET)) {}
+        return true;
+    }
+
+    return false;
+}
+
+bool Parser::IsExpression(int &size, int &type)
+{
+    bool isNotOp;
+    ValidateToken(T_NOT) ? isNotOp = true : isNotOp = false;
+
+    if (IsArithOp(size, type))
+    {
+        if ((isNotOp) && (type != T_BOOL) && (type != T_INTEGER))
+        {
+            ReportError("'NOT' operator is only defined for bool and integer types");
+        }
+        else if (isNotOp)
+        {
+            // TODO: code gen?
+        }
+
+        IsExpressionPrime(size, type);
+        return true;
+    }
+    else if (isNotOp)
+    {
+        ReportError("Expected integer/bool arithmetic operation following 'NOT'"); // TODO: FatalError?
+        return true;
+    }
+
+    return false;
+}
+
+bool Parser::IsExpressionPrime(int &size, int &type)
+{
+    int opSize, opType;
+    std::string op = token->str; // for code gen
+
+    if (ValidateToken(T_OR) || ValidateToken(T_AND))
+    {
+        ValidateToken(T_NOT); // optional
+        if (IsArithOp(opSize, opType))
+        {
+            if ((type == T_INTEGER) && (opType != T_INTEGER)) // TODO: Messages
+            {
+                ReportError("Only integer arithmetic operators can be used with bitwise '|' and '&'");
+            }
+            else if ((type == T_BOOL) && (opType != T_BOOL))
+            {
+                ReportError("Only boolean arithmetic operators can be used with boolean '|' and '&'");
+            }
+            else
+            {
+                ReportError("Only integer / boolean operators can be used for bitwise / boolean operators '|' and '&'.");
+            }
+
+            if ((size != opSize) && (size != 0) && (opSize != 0))
+            {
+                ReportError("Expected arithmetic op size: " + std::to_string(size) + ", Found size of: " + std::to_string(opSize));
+            }
+            else if (opSize !=0 )
+            {
+                size = opSize;
+            }
+        }
+        else
+        {
+            ReportError("Expected arithmetic op after '|' or '&' "); // todo: improve message
+        }
+
+        IsExpression(size, type);
+
+        return true;
+    }
+
+    return false;
+}
+
+bool Parser::IsArithOp(int &size, int &type)
+{
+    if (IsRelation(size, type))
+    {
+        IsArithOpPrime(size, type);
+        return true;
+    }
+
+    return false;
+}
+
+bool Parser::IsArithOpPrime(int &size, int &type)
+{
+    int relSize;
+    int relType;
+
+    std::string op = token->str; // for code gen
+
+    if (!ValidateToken(T_ADD) || !ValidateToken(T_SUBTRACT))
+    {
+        return false;
+    }
+
+    if (IsRelation(relSize, relType))
+    {
+        if (!IsNumber(relType) || !IsNumber(type))
+        {
+            ReportError("Value must be integer or float for arithmetic operations");
+        }
+
+        if ((size != relSize) && (size != 0) && (relSize != 0))
+        {
+            ReportError("Relation size expected: " + std::to_string(size) + ", Size Found: " + std::to_string(relSize));
+        }
+        else if (relSize != 0)
+        {
+            size = relSize;
+        }
+    }
+    else
+    {
+        ReportError("Expected a relation after arithmetic operator");
+    }
+
+    IsArithOpPrime(size, type);
+
+    return true;
+}
+
+bool Parser::IsRelation(int &size, int &type)
+{
+    if (IsTerm(size, type))
+    {
+        if (IsRelationPrime(size, type))
+        {
+            type = T_BOOL;
+            return true; // not sure if this should be outside this condition
+        }
+    }
+
+    return false;
+}
+
+bool Parser::IsRelationPrime(int &size, int &type)
+{
+    int termSize, termType;
+    std::string op = token->str; // for code gen
+
+    if (ValidateToken(T_LESSTHAN) || ValidateToken(T_GREATERTHAN) || ValidateToken(T_LTEQ) || ValidateToken(T_GTEQ))
+    {
+        if (IsTerm(termSize, termType))
+        {
+            if (((type != T_BOOL) && (type != T_INTEGER)) || ((termType != T_BOOL) && (termType != T_INTEGER)))
+            {
+                ReportError("Relational ops are only valid for types of bool or integers('0' or '1')"); // TODO: msg
+            }
+
+            if ((size != termSize) && (size != 0) && (termSize != 0))
+            {
+                ReportError("Expected term size: " + std::to_string(size) + ", Found size:  " + std::to_string(termSize));
+            }
+            else if (termSize != 0)
+            {
+                size = termSize;
+            }
+        }
+        else
+        {
+            ReportError("Expected term after relational operator"); // todo: msg
+        }
+
+        IsRelation(size, type);
+
+        return true;
+    }
+
+    return false;
+}
+
+bool Parser::IsTerm(int &size, int &type)
+{
+    if (IsFactor(size, type))
+    {
+        IsTermPrime(size, type);
+        return true;
+    }
+
+    return false;
+}
+
+bool Parser::IsTermPrime(int &size, int &type)
+{
+    int factorSize, factorType;
+    std::string op = token->str; // for code gen
+
+    if (!ValidateToken(T_MULTIPLY) || !ValidateToken(T_DIVIDE))
+    {
+        return false;
+    }
+
+    if (IsFactor(factorSize, factorType))
+    {
+        if (!IsNumber(type) || !IsNumber(factorType))
+        {
+            ReportError("Only integer and float values are allowed for arithmetic ops in terms"); // TODO: Msg
+        }
+
+        if ((size != factorSize) && ((size !=0 ) && (factorSize != 0)))
+        {
+            ReportError("Expected factor size: " + std::to_string(size) + ", Found size: " + std::to_string(factorSize));
+        }
+        else if (factorSize != 0)
+        {
+            size = factorSize;
+        }
+    }
+    else
+    {
+        ReportError("Expected factor after arithmetic operator"); // TODO: Msg
+    }
+
+    IsTermPrime(size, type);
+
+    return true;
+}
+
+bool Parser::IsFactor(int &size, int &type)
+{
+    int tempSize, tempType;
+
+    if (ValidateToken(T_LPAREN))
+    {
+        if (IsExpression(tempSize, tempType))
+        {
+            size = tempSize;
+            type = tempType;
+            if (ValidateToken(T_RPAREN))
+            {
+                return true;
+            }
+            else
+            {
+                ReportError("Expected ')' around expression"); // TODO msg and fatal error
+            }
+        }
+        else
+        {
+            ReportError("Expected expression in parenthesis"); // TODO: msg / fatal error
+        }
+    }
+    else if (ValidateToken(T_SUBTRACT))
+    {
+        if (IsInt())
+        {
+            type = T_INTEGER;
+            size = 0;
+            return true;
+        }
+        else if (IsFloat())
+        {
+            type = T_FLOAT;
+            size = 0;
+            return true;
+        }
+        else if (IsName(tempSize, tempType))
+        {
+            size = tempSize;
+            type = tempType;
+
+            if (!IsNumber(type))
+            {
+                ReportError("'-' only valid before integer and floats"); // TODO: msg
+            }
+
+            return true;
+        }
+
+        return false;
+    }
+    else if (IsName(tempSize, tempType))
+    {
+        size = tempSize;
+        type = tempType;
+        return true;
+    }
+    else if (IsInt())
+    {
+        size = 0;
+        type = T_INTEGER;
+        return true;
+    }
+    else if (IsFloat())
+    {
+        size = 0;
+        type = T_FLOAT;
+        return true;
+    }
+    else if (IsBool())
+    {
+        size = 0;
+        type = T_BOOL;
+        return true;
+    }
+    else if (IsString())
+    {
+        size = 0;
+        type = T_STRING;
+        return true;
+    }
+    else if (IsEnum())
+    {
+        size = 0;
+        type = T_ENUM;
+        return true;
+    }
+
+    return false;
+}
+
+bool Parser::IsNumber(int &type)
+{
+    if ((type == T_INTEGER) || (type == T_FLOAT))
+    {
+        return true;
+    }
+
+    return false;
+}
+
+bool Parser::IsName(int &size, int &type)
+{
+    std::string id;
+    bool isGlobal;
+    Node n;
+
+    if (IsIdentifier(id))
+    {
+        bool isFound = symbolTable->DoesSymbolExist(id, isGlobal, n);
+        if (isFound)
+        {
+            if (n.type == T_PROCEDURE)
+            {
+                ReportError(id + " is not a variable in this scope"); // todo: msg
+            }
+            else
+            {
+                size = n.size;
+                type = n.type;
+            }
+        }
+        else
+        {
+            ReportError(id + " is not declared in this scope"); // todo: msg
+            size = 0;
+            type = T_UNKNOWN;
+        }
+
+        // TODO: implement array stuff
+//        if (ValidateToken(T_LBRACKET)) {}
+
+        return true;
+    }
+
+    return false;
+}
+
+bool Parser::IsInt()
+{
+    std::string str = token->str;
+
+    if (ValidateToken(T_INT_LITERAL))
+    {
+        return true;
+    }
+
+    return false;
+}
+
+bool Parser::IsFloat()
+{
+    std::string str = token->str;
+
+    if (ValidateToken(T_FLOAT_LITERAL))
+    {
+        return true;
+    }
+
+    return false;
+}
+
+bool Parser::IsString()
+{
+    std::string str = token->str;
+
+    if (ValidateToken(T_STRING_LITERAL))
+    {
+        return true;
+    }
+
+    return false;
+}
+
+bool Parser::IsBool()
+{
+    // TODO: Might need to fix these
+    std::string str = token->str;
+
+    if (ValidateToken(T_TRUE))
+    {
+        return true;
+    }
+
+    if (ValidateToken(T_FALSE))
+    {
+        return true;
+    }
+
+    return false;
+}
+
+bool Parser::IsEnum()
+{
+    // TODO: might need to fix these
+    std::string str = token->str;
+
+    if (ValidateToken(T_ENUM))
     {
         return true;
     }

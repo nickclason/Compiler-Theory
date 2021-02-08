@@ -58,6 +58,25 @@ class Parser {
         bool IsProcedureHeader(std::string &id, int &type, bool isGlobal);
         bool IsProcedureBody();
         bool TypeCheck();
+        bool IsValidAssignment(std::string &id, bool &isFound, bool &isGlobal, Node &n, int &checkSize, int &checkType);
+        bool IsExpression(int &size, int &type);
+        bool IsExpressionPrime(int &size, int &type);
+        bool IsArithOp(int &size, int &type);
+        bool IsArithOpPrime(int &size, int &type);
+        bool IsRelation(int &size, int &type);
+        bool IsRelationPrime(int &size, int &type);
+        bool IsTerm(int &size, int &type);
+        bool IsTermPrime(int &size, int &type);
+        bool IsFactor(int &size, int &type);
+
+        bool IsNumber(int &type);
+        bool IsName(int &size, int &type);
+        bool IsInt();
+        bool IsFloat();
+        bool IsString();
+        bool IsBool();
+        bool IsEnum();
+
 
 };
 

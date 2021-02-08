@@ -1,10 +1,12 @@
 program LoopFib is
 global variable x : integer;
-// this is a comment
     procedure f : integer(variable x : integer)
-        variable b : integer;
+        variable b : string;
         variable y : integer;
     begin
+        b := "Nick";
+        y := 4;
+        return y;
     end procedure;
 begin
 end program.

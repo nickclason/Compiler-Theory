@@ -39,7 +39,7 @@ class SymbolTable {
 
         bool AddSymbol(std::string id, int type, std::vector<Node> args, bool isGlobal); // maybe make this bool
         bool AddSymbolToParentScope(std::string id, int type, std::vector<Node> args, bool isGlobal); // maybe make this bool
-        bool DoesSymbolExist(std::string id, bool &isGlobal);
+        bool DoesSymbolExist(std::string id, bool &isGlobal, Node &n);
 
         int getScope();
 

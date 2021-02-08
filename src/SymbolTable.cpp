@@ -81,7 +81,7 @@ bool SymbolTable::AddSymbolToParentScope(std::string id, int type, std::vector<N
     return false;
 }
 
-bool SymbolTable::DoesSymbolExist(std::string id, bool &isGlobal)
+bool SymbolTable::DoesSymbolExist(std::string id, bool &isGlobal, Node &n)
 {
     int type = T_UNKNOWN;
     it = symTableScopes[currScope].find(id);
@@ -89,6 +89,7 @@ bool SymbolTable::DoesSymbolExist(std::string id, bool &isGlobal)
     if (it != symTableScopes[currScope].end())
     {
         isGlobal = false; // TODO: I think?
+        n = it->second;
         return true;
     }
 
@@ -96,6 +97,7 @@ bool SymbolTable::DoesSymbolExist(std::string id, bool &isGlobal)
     if (it != symTableScopes[0].end() && symTableScopes[0][id].isGlobal) // In global scope and declared as global
     {
         isGlobal = true;
+        n = it->second;
         return true;
     }
 
