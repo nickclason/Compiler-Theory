@@ -21,6 +21,7 @@ Parser::Parser(token_t *tokenPtr, Scanner *scannerPtr, SymbolTable* symbolTableP
     // Parsing Starts Here
     Program();
 
+    // Display Errors
     char errorCh = (errorCount > 1 || errorCount == 0) ? 's' : '\0';
     char warningCh = (warningCount > 1 || warningCount == 0) ? 's' : '\0';
     printf("\nParsing Completed with %d error%c and %d warning%c", errorCount, errorCh, warningCount, warningCh);
@@ -116,7 +117,6 @@ bool Parser::ProgramBody()
     {
         while (IsDeclaration(isProcedureDec))
         {
-//            token = scanner->GetToken();
             if (isProcedureDec)
             {
                 if (!ValidateToken(T_SEMICOLON)) {
@@ -132,14 +132,12 @@ bool Parser::ProgramBody()
             }
         }
 
-        //token = scanner->GetToken();
         if (ValidateToken(T_BEGIN))
         {
             while (true)
             {
                 while (IsStatement())
                 {
-//                    token = scanner->GetToken();
                     if (!ValidateToken(T_SEMICOLON))
                     {
                         ReportError("Expected ';' after expression in program body"); // TODO: Change msg
@@ -147,10 +145,8 @@ bool Parser::ProgramBody()
                 }
 
                 // Get end of program body
-//                token = scanner->GetToken();
                 if (ValidateToken(T_END))
                 {
-//                    token = scanner->GetToken();
                     if (ValidateToken(T_PROGRAM))
                     {
                         return true;
@@ -171,7 +167,6 @@ bool Parser::ProgramBody()
         else
         {
             // TODO: ReportFatalError?
-
             ReportError("Could not find another valid declaration or start of program execution"); // TODO: Change msg
             return false;
         }
@@ -322,8 +317,6 @@ bool Parser::IsStatement()
 
 bool Parser::IsProcedureDeclaration(std::string &id, int &type, bool isGlobal)
 {
-    // TODO: Implement method
-
     if (IsProcedureHeader(id, type, isGlobal))
     {
         if (IsProcedureBody())
@@ -342,20 +335,15 @@ bool Parser::IsProcedureDeclaration(std::string &id, int &type, bool isGlobal)
 bool Parser::IsVariableDeclaration(std::string &id, int &type, bool isGlobal)
 {
     // TODO: Add array and enum? support
-
     if (isGlobal)
     {
-//        token = scanner->GetToken();
         if (ValidateToken(T_VARIABLE))
         {
-//            token = scanner->GetToken();
             if (ValidateToken(T_IDENTIFIER))
             {
                 id = token->str;
-//                token = scanner->GetToken();
                 if (ValidateToken(T_COLON))
                 {
-//                    token = scanner->GetToken();
                     if (TypeCheck())
                     {
                         type = token->type;
@@ -425,8 +413,103 @@ bool Parser::IsVariableDeclaration(std::string &id, int &type, bool isGlobal)
 
 bool Parser::IsIfStatement()
 {
-    // TODO: Implement method
-    return false;
+    int size, type;
+    bool statementFlag;
+
+    if (!ValidateToken(T_IF))
+    {
+        return false;
+    }
+
+    if (!ValidateToken(T_LPAREN))
+    {
+        ReportError("'(' is expected before condition in if statement");;
+    }
+    else if (!IsExpression(size, type))
+    {
+        ReportError("Condition expected for if statement");
+    }
+    else if (type != T_BOOL)
+    {
+        ReportError("Expression must evaluate to bool in if statement condition");
+    }
+    else if (!ValidateToken(T_RPAREN))
+    {
+        ReportError("')' expected after condition in if statement");
+    }
+
+    if (ValidateToken(T_THEN))
+    {
+        statementFlag = false;
+        while (true)
+        {
+            while (IsStatement())
+            {
+                statementFlag = true;
+                if (!ValidateToken(T_SEMICOLON))
+                {
+                    ReportError("Expected ';' after statement in 'if' condition");
+                }
+            }
+
+            if (!statementFlag)
+            {
+                ReportError("At least one statement is expected after 'then'");
+            }
+
+            if (ValidateToken(T_ELSE))
+            {
+                statementFlag = false;
+                while (true)
+                {
+                    while (IsStatement())
+                    {
+                        statementFlag = true;
+                        if (!ValidateToken(T_SEMICOLON))
+                        {
+                            ReportError("Expected ';' after statement in 'else' condition");
+                        }
+                    }
+
+                    if (ValidateToken(T_END))
+                    {
+                        if (!statementFlag)
+                        {
+                            ReportError("At least one statement expected after 'else'");
+                        }
+
+                        if (!ValidateToken(T_IF))
+                        {
+                            ReportError("Missing 'if' in 'end if' closure"); // todo: fatal error
+                        }
+
+                        return true;
+                    }
+                    else
+                    {
+                        ReportError("Unable to find valid statement"); // todo: fatal error
+                        return true;
+                    }
+                }
+            }
+            else if (ValidateToken(T_END))
+            {
+                if (!ValidateToken(T_IF))
+                {
+                    ReportError("Missing 'if' in 'end if' closure"); //todo: fatal error
+                }
+                return true;
+            }
+            else
+            {
+                ReportError("Unable to find valid statement"); // todo: fatal error
+                return true;
+            }
+
+        }
+    }
+
+    ReportError("'then' expected after condition in if statement"); // TODO: fatal error
 }
 
 bool Parser::IsLoopStatement()
@@ -791,10 +874,9 @@ bool Parser::IsArithOpPrime(int &size, int &type)
 
     std::string op = token->str; // for code gen
 
-    if (!ValidateToken(T_ADD) || !ValidateToken(T_SUBTRACT))
-    {
-        return false;
-    }
+    if (ValidateToken(T_ADD));
+    else if (ValidateToken(T_SUBTRACT));
+    else return false;
 
     if (IsRelation(relSize, relType))
     {
@@ -829,8 +911,8 @@ bool Parser::IsRelation(int &size, int &type)
         if (IsRelationPrime(size, type))
         {
             type = T_BOOL;
-            return true; // not sure if this should be outside this condition
         }
+        return true;
     }
 
     return false;

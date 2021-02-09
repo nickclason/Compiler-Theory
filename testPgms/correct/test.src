@@ -1,12 +1,14 @@
-program LoopFib is
-global variable x : integer;
-    procedure f : integer(variable x : integer)
-        variable b : string;
+program test_program is
+    global variable x : integer;
+    procedure testProc : integer(variable x : integer)
+        variable b : integer;
         variable y : integer;
     begin
-        b := "Nick";
-        y := 4;
-        return y;
+        b := 3;
+        y := b;
     end procedure;
 begin
+    // call testProc
+    x := 3;
+    // x := testProc(3);
 end program.
