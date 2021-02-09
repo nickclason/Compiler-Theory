@@ -32,7 +32,7 @@ class Parser {
         // TODO:
         //      Add to error functions as needed
         void DisplayAllErrors();
-        void ReportError(std::string errorMsg);
+        void ReportError(std::string errorMsg); // TODO: make reference or const
         void ReportTokenError(std::string errorMsg);
         void ReportExpectedTypeError(std::string errorMsg);
         void ReportTypeCheckError(std::string errorMsg);

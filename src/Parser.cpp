@@ -222,7 +222,6 @@ void Parser::DisplayAllErrors()
     }
     std::cout << std::endl;
 
-    return;
 }
 
 void Parser::ReportError(std::string errorMsg)
@@ -514,8 +513,67 @@ bool Parser::IsIfStatement()
 
 bool Parser::IsLoopStatement()
 {
-    // TODO: Implement method
-    return false;
+    int size, type;
+    std::string id;
+
+    if (!ValidateToken(T_FOR))
+    {
+        return false;
+    }
+
+    if (!ValidateToken(T_LPAREN))
+    {
+        ReportError("Expected '(' before for loop statement"); // TODO: msg and fatalerror?
+    }
+
+    if (!IsAssignmentStatement(id))
+    {
+        ReportError("Expected assignment statement after '('"); // TODO: msg
+    }
+
+    if (!ValidateToken(T_SEMICOLON))
+    {
+        ReportError("Expected ';' after assignment statement in for loop"); // TODO: msg
+    }
+
+    if (!IsExpression(size, type))
+    {
+        ReportError("Expression expected after assignment in for loop"); // TODO: msg
+    }
+
+    if (!ValidateToken(T_RPAREN))
+    {
+        ReportError("Expected ')' after expression in for loop"); // TODO: msg
+    }
+
+    // Loop Body
+    while (true)
+    {
+        while (IsStatement())
+        {
+            if (!ValidateToken(T_SEMICOLON))
+            {
+                ReportError("Expected ';' after statement"); // TODO: msg
+            }
+        }
+
+        if (ValidateToken(T_END))
+        {
+            if (ValidateToken(T_FOR))
+            {
+                return true;
+            }
+            else
+            {
+                ReportError("Missing 'for' in 'end for' loop closure"); //todo: msg
+            }
+        }
+        else
+        {
+            ReportError("Expected 'end for' at end of for loop"); // todo: msg
+            return false;
+        }
+    }
 }
 
 bool Parser::IsReturnStatement()
