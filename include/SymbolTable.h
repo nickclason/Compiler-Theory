@@ -46,7 +46,7 @@ class SymbolTable {
 
     private:
         int currScope;
-        std::vector<std::map<std::string, Node>> symTableScopes;
+        std::vector<std::map<std::string, Node> > symTableScopes;
         std::map<std::string, Node>::iterator it;
 
         // Debug Methods
