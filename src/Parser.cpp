@@ -8,6 +8,10 @@
 //      resync???????                   -
 //      Might need a larger error class -
 
+// TODO: enums/custom type declarations
+
+// TODO: Get/Put int, float, bool, string, etc. These are for the runtime env, but also I think technically could be
+//       defined in the global scope?
 
 Parser::Parser(token_t *tokenPtr, Scanner *scannerPtr, SymbolTable* symbolTablePtr)
 {
@@ -60,17 +64,15 @@ void Parser::Program()
     }
 
     // TODO: Treat leaving of the period as a warning and not an error. May change later
-//    token = scanner->GetToken();
     if (!ValidateToken(T_PERIOD))
     {
         ReportWarning("Expected '.' at the end of program"); // TODO: Change msg
     }
 
-//    token = scanner->GetToken();
     if (ValidateToken(T_EOF))
     {
         // TODO: Exit scope, I dont think i really need to do anything explicitly to exit this scope?
-        //       We do have a ChangeScope() method if needed.
+        //       We do have SetScope method if needed.
         return;
     }
     else
@@ -82,13 +84,11 @@ void Parser::Program()
 bool Parser::ProgramHeader()
 {
     // TODO: Rewrite/Cleanup/Optimize
-//    token = scanner->GetToken();
     if (ValidateToken(T_PROGRAM))
     {
         std::string ident;
         if (IsIdentifier(ident))
         {
-//            token = scanner->GetToken();
             if (ValidateToken(T_IS))
             {
                 return true;
@@ -136,6 +136,8 @@ bool Parser::ProgramBody()
         {
             while (true)
             {
+                int scope = 0;
+                symbolTable->SetScope(scope); // I think it is acceptable to set the scope to 0 (global scope) here in the program body
                 while (IsStatement())
                 {
                     if (!ValidateToken(T_SEMICOLON))
@@ -264,12 +266,11 @@ void Parser::ReportWarning(std::string warningMsg)
     warningCount++;
 }
 
-bool Parser::IsIdentifier(std::string &ident)
+bool Parser::IsIdentifier(std::string &id)
 {
-//    token = scanner->GetToken();
     if (ValidateToken(T_IDENTIFIER))
     {
-        ident = token->str;
+        id = token->str;
         return true;
     }
 
@@ -279,19 +280,23 @@ bool Parser::IsIdentifier(std::string &ident)
 bool Parser::IsDeclaration(bool &isProcedureDec)
 {
     bool isGlobal;
-    std::string id;
-    int type;
+    Symbol symbol;
+    symbol.parameters.clear();
 
-//    token = scanner->GetToken();
     ValidateToken(T_GLOBAL) ? isGlobal = true : isGlobal = false;
 
-    if (IsProcedureDeclaration(id, type, isGlobal))
+    if (IsProcedureDeclaration(symbol, isGlobal))
     {
+        int scope = symbolTable->GetScope() - 1;
+        symbolTable->AddSymbolToScope(symbol, scope); // In addition to adding the proc to its own scope, add it to the scope 1 higher as well.
+        symbolTable->SetScope(scope);
+        isProcedureDec = true;
+
         return true;
     }
-    else if (IsVariableDeclaration(id, type, isGlobal))
+    else if (IsVariableDeclaration(symbol, isGlobal))
     {
-        symbolTable->AddSymbol(id, type, std::vector<Node>(), isGlobal);
+        symbolTable->AddSymbol(symbol);
         return true;
     }
     else if (isGlobal)
@@ -303,20 +308,9 @@ bool Parser::IsDeclaration(bool &isProcedureDec)
     return false;
 }
 
-bool Parser::IsStatement()
+bool Parser::IsProcedureDeclaration(Symbol &symbol, bool isGlobal)
 {
-    std::string id = "";
-    if (IsIfStatement()) return true;
-    else if (IsLoopStatement()) return true;
-    else if (IsReturnStatement()) return true;
-    else if (IsAssignmentStatement(id)) return true;
-    else if (IsProcedureCall(id)) return true;
-    else return false;
-}
-
-bool Parser::IsProcedureDeclaration(std::string &id, int &type, bool isGlobal)
-{
-    if (IsProcedureHeader(id, type, isGlobal))
+    if (IsProcedureHeader(symbol, isGlobal))
     {
         if (IsProcedureBody())
         {
@@ -331,9 +325,168 @@ bool Parser::IsProcedureDeclaration(std::string &id, int &type, bool isGlobal)
     return false;
 }
 
-bool Parser::IsVariableDeclaration(std::string &id, int &type, bool isGlobal)
+bool Parser::IsProcedureHeader(Symbol &symbol, bool isGlobal)
 {
-    // TODO: Add array and enum? support
+    std::string id;
+    int type;
+    int size = 0;
+
+    if (ValidateToken(T_PROCEDURE))
+    {
+        symbolTable->AddScope(); // Add new scope for the procedure
+        if (IsIdentifier(id))
+        {
+            if (ValidateToken(T_COLON))
+            {
+                if (TypeCheck(type))
+                {
+                    if (ValidateToken(T_LPAREN))
+                    {
+                        //Symbol symbol;
+                        IsParameterList(symbol);
+                        if (!ValidateToken(T_RPAREN))
+                        {
+                            ReportError("Expected ')' after parameter list"); // TODO: msg
+                        }
+
+                        // Any parameters that exist should have alredy been added by IsParameterList()
+                        symbol.type = type;
+                        symbol.declarationType = T_PROCEDURE;
+                        symbol.size = size;
+                        symbol.isGlobal = isGlobal;
+                        symbol.id = id;
+                        symbolTable->AddSymbol(symbol); // This is to make recursion possible
+
+                        return true;
+                    }
+                    else
+                    {
+                        ReportError("Expected '('"); // TODO: Change msg
+                        return true;
+                    }
+                }
+                else
+                {
+                    ReportError("Expected type");
+                    return true;
+                }
+            }
+            else
+            {
+                ReportError("Expected ':' after identifier");
+                return true;
+            }
+        }
+        else
+        {
+            ReportError("Identifier expected after 'procedure' keyword");
+            return true;
+        }
+    }
+
+    return false;
+}
+
+bool Parser::IsParameterList(Symbol &symbol)
+{
+    if (IsParameter(symbol))
+    {
+        while (ValidateToken(T_COMMA))
+        {
+            if(!IsParameter(symbol))
+            {
+                ReportError("Parameter expected after ',' in parameter list"); // todo msg
+            }
+        }
+    }
+
+    return true;
+}
+
+bool Parser::IsParameter(Symbol &symbol)
+{
+    Symbol newParameter;
+    bool isGlobal;
+
+    if (IsVariableDeclaration(newParameter, isGlobal))
+    {
+        // Add the parameter to the procedures scope and to the procedures symbol
+        //
+        symbolTable->AddSymbol(newParameter);
+        symbol.parameters.push_back(newParameter);
+
+        return true;
+    }
+
+    return false;
+}
+
+bool Parser::IsProcedureBody()
+{
+    bool isProcDeclaration = false;
+
+    while (true)
+    {
+        while (IsDeclaration(isProcDeclaration))
+        {
+            if (isProcDeclaration)
+            {
+                if (!ValidateToken(T_SEMICOLON))
+                {
+                    ReportError("Expected ';' after procedure declaration");
+                }
+            }
+            else if (!ValidateToken(T_SEMICOLON))
+            {
+                ReportError("Expected ';' after variable declaration");
+            }
+        }
+
+        if (ValidateToken(T_BEGIN))
+        {
+            while (true)
+            {
+                while (IsStatement())
+                {
+                    if (!ValidateToken(T_SEMICOLON))
+                    {
+                        ReportError("Expected ';' after statement in procedure");
+                    }
+                }
+
+                if (ValidateToken(T_END))
+                {
+                    if (ValidateToken(T_PROCEDURE))
+                    {
+                        return true;
+                    }
+                    else
+                    {
+                        ReportError("Expected 'end procedure' at end of procedure declaration"); // TODO: Change msg
+                        return true; // TODO: Treat this as a warning?
+                    }
+                }
+                else
+                {
+                    ReportError("Expected 'end procedure' at the end of procedure declaration");
+                    return false;
+                }
+            }
+        }
+        else
+        {
+            ReportError("Could not find valid declaration or 'begin' keyword in procedure body"); // TODO: Modify
+            return false;
+        }
+    }
+}
+
+bool Parser::IsVariableDeclaration(Symbol &symbol, bool isGlobal)
+{
+    std::string id;
+    int type, size;
+
+    // TODO: Enum/user type support
     if (isGlobal)
     {
         if (ValidateToken(T_VARIABLE))
@@ -343,9 +496,31 @@ bool Parser::IsVariableDeclaration(std::string &id, int &type, bool isGlobal)
                 id = token->str;
                 if (ValidateToken(T_COLON))
                 {
-                    if (TypeCheck())
+                    if (TypeCheck(type))
                     {
-                        type = token->type;
+                        if (ValidateToken(T_LBRACKET))
+                        {
+                            if (ValidateToken(T_INTEGER) || ValidateToken(T_INT_LITERAL)) // I would assume anything that EVALUATES to an int could go here (i.e. ffunction call)?
+                            {
+                                size = token->val.intValue;
+                                if (!ValidateToken(T_RBRACKET))
+                                {
+                                    ReportError("Expected ']' at end of array declaration");
+                                }
+                            }
+                        }
+                        else
+                        {
+                            size = 0;
+                        }
+
+
+                        symbol.id = id;
+                        symbol.type = type;
+                        symbol.declarationType = T_VARIABLE;
+                        symbol.size = size;
+                        symbol.isGlobal = isGlobal; // This should always be true in this spot in the code
+                        symbol.parameters = std::vector<Symbol>(); // Variables should not have parameters
                         return true;
                     }
                     else
@@ -370,20 +545,36 @@ bool Parser::IsVariableDeclaration(std::string &id, int &type, bool isGlobal)
     }
     else // i think this could be made else if(T_VARIABLE)
     {
-//        token = scanner->GetToken();
         if (ValidateToken(T_VARIABLE))
         {
-//            token = scanner->GetToken();
             if (ValidateToken(T_IDENTIFIER))
             {
                 id = token->str;
-//                token = scanner->GetToken();
                 if (ValidateToken(T_COLON))
                 {
-//                    token = scanner->GetToken();
-                    if (TypeCheck())
+                    if (TypeCheck(type))
                     {
-                        type = token->type;
+                        if (ValidateToken(T_LBRACKET))
+                        {
+                            if (ValidateToken(T_INTEGER) || ValidateToken(T_INT_LITERAL)) // I would assume anything that EVALUATES to an int could go here?
+                            {
+                                size = token->val.intValue;
+                                if (!ValidateToken(T_RBRACKET))
+                                {
+                                    ReportError("Expected ']' at end of array declaration");
+                                }
+                            }
+                        }
+                        else
+                        {
+                            size = 0;
+                        }
+                        symbol.id = id;
+                        symbol.type = type;
+                        symbol.declarationType = T_VARIABLE;
+                        symbol.size = size;
+                        symbol.isGlobal = isGlobal;
+                        symbol.parameters = std::vector<Symbol>(); // Variables should not have parameters
                         return true;
                     }
                     else
@@ -408,6 +599,16 @@ bool Parser::IsVariableDeclaration(std::string &id, int &type, bool isGlobal)
     }
 
     return false;
+}
+
+bool Parser::IsStatement()
+{
+    std::string id = "";
+    if (IsIfStatement()) return true;
+    else if (IsLoopStatement()) return true;
+    else if (IsReturnStatement()) return true;
+    else if (IsAssignmentStatement(id)) return true;
+    else return false;
 }
 
 bool Parser::IsIfStatement()
@@ -504,7 +705,6 @@ bool Parser::IsIfStatement()
                 ReportError("Unable to find valid statement"); // todo: fatal error
                 return true;
             }
-
         }
     }
 
@@ -578,17 +778,27 @@ bool Parser::IsLoopStatement()
 
 bool Parser::IsReturnStatement()
 {
-    // TODO: Implement method
+    int size, type;
+    if (ValidateToken(T_RETURN))
+    {
+        // TODO: add stuff for code gen
+        if (IsExpression(size, type))
+        {
+            return true;
+        }
+        return true;
+    }
+
     return false;
 }
 
 bool Parser::IsAssignmentStatement(std::string &id)
 {
-    Node n;
+    Symbol symbol;
     int size, type, checkSize, checkType;
     bool isFound;
     bool isGlobal;
-    bool isValidAssignment = IsValidAssignment(id, isFound, isGlobal, n, checkSize, checkType);
+    bool isValidAssignment = IsValidAssignment(id, isFound, isGlobal, symbol, checkSize, checkType);
 
     if (!isValidAssignment)
     {
@@ -600,15 +810,37 @@ bool Parser::IsAssignmentStatement(std::string &id)
         IsExpression(size, type);
         if (isFound)
         {
-            if (size != checkSize && (size > 1) && (checkSize <= 1))
+            if ((size != checkSize) && (size > 1) && (checkSize <= 1))
             {
                 ReportError("Invalid assignment, size of expression must match destination size"); // todo: msg
             }
-            if ((type != checkType) && ((!IsNumber(type)) || (!IsNumber(checkType))))
-            {
-                ReportError("Invalid assignment, type of expression must match destination type"); // todo: msg
-            }
 
+            if (type != checkType)
+            {
+                // 0 is false, all other int values are converted to true
+                if ((checkType == T_INTEGER) && ((type == T_BOOL) || type == T_FLOAT))
+                {
+                    // probably some codegen stuff here
+                    // convert bool/float to integers
+                    type = T_INTEGER;
+                }
+                else if((checkType == T_BOOL) && (type == T_INTEGER))
+                {
+                    // probably some codegen stuff here
+                    // convert integers to bool
+                    type = T_INTEGER;
+                }
+                else if ((checkType == T_FLOAT) && (type == T_INTEGER))
+                {
+                    // code gen stuff
+                    // convert integers to floats
+                    type = T_FLOAT;
+                }
+                else
+                {
+                    ReportError("Type mismatch in expression"); // todo msg
+                }
+            }
         }
 
         return true;
@@ -620,183 +852,115 @@ bool Parser::IsAssignmentStatement(std::string &id)
     }
 }
 
-bool Parser::IsProcedureCall(std::string &id)
+bool Parser::IsProcedureCall(std::string &id, int &size, int &type)
 {
-    // TODO: Implement method
-    return false;
-}
+    std::vector<Symbol> parameterList;
+    Symbol procedureCall;
+    bool isGlobal;
+    bool isFound;
 
-bool Parser::IsProcedureHeader(std::string &id, int &type, bool isGlobal)
-{
-    // TODO: Add error messages and fix all this
+    // check that id != ""
+    // check if symbol exists
+    // get argument list (aka parse '(variable x : integer) )'
+    // if (found)
+    //      compare arguments, make sure sizes/types match
+    //      ~ codegen stuff ~
+    //      return true
+    // else
+    //      proc not declared in this scope
 
-    if (ValidateToken(T_PROCEDURE))
+    token_t* tempToken = scanner->PeekToken();
+    id = tempToken->str;
+    if (tempToken->type != T_IDENTIFIER)
     {
-        // Add new scope for procedure
-        symbolTable->AddScope();
-        if (IsIdentifier(id))
-        {
-//            token = scanner->GetToken();
-            if (ValidateToken(T_COLON))
-            {
-//                token = scanner->GetToken();
-                if (TypeCheck())
-                {
-                    type = token->type;
-//                    token = scanner->GetToken();
-                    if (ValidateToken(T_LPAREN))
-                    {
-//                        token = scanner->GetToken();
-                        if (ValidateToken(T_RPAREN))
-                        {
-                            // No parameters
-                            symbolTable->AddSymbol(id, type, std::vector<Node>(), isGlobal);
-                            return true;
-                        }
-                        else if (ValidateToken(T_VARIABLE))
-                        {
-                            // TODO: I think there can only be 1 parameter per procedure, might need to change
-                            //       if this is not true
-
-                            //token = scanner->GetToken();
-                            std::string varId;
-                            if (IsIdentifier(varId))
-                            {
-//                                token = scanner->GetToken();
-                                if (ValidateToken(T_COLON))
-                                {
-//                                    token = scanner->GetToken();
-                                    if (TypeCheck())
-                                    {
-                                        int varType = token->type;
-//                                        token = scanner->GetToken();
-                                        if (ValidateToken(T_RPAREN))
-                                        {
-                                            Node paramNode;
-                                            paramNode.id = varId;
-                                            paramNode.size = 0;
-                                            paramNode.isGlobal = false;
-                                            paramNode.type = varType;
-                                            paramNode.args = std::vector<Node>();
-
-                                            std::vector<Node> args;
-                                            args.push_back(paramNode);
-                                            symbolTable->AddSymbol(id, type, args, isGlobal);
-
-                                            return true;
-                                        }
-                                        else
-                                        {
-                                            ReportError("Expected ')'");
-                                        }
-                                    }
-                                    else
-                                    {
-                                        ReportError("Type Expected: Missing or invalid type"); // TODO: Change msg
-                                    }
-                                }
-                                else
-                                {
-                                    ReportError("Expected ':' after identifier");
-                                }
-                            }
-                            else
-                            {
-                                ReportError("Expected identifier after 'variable' keyword");
-                            }
-
-                        }
-                        else
-                        {
-                            ReportError("Expected ')'"); // TODO: Change msg
-                        }
-                    }
-                    else
-                    {
-                        ReportError("Expected ')'"); // TODO: Change msg
-                    }
-                }
-                else
-                {
-                    ReportError("Expected type");
-                }
-            }
-            else
-            {
-                ReportError("Expected ':' after identifier");
-            }
-        }
-        else
-        {
-            ReportError("Identifier expected after 'procedure' keyword");
-        }
-
+        return false;
     }
 
-    return false;
-}
-
-bool Parser::IsProcedureBody()
-{
-    bool isProcDeclaration = false;
-
-    while (true)
+    if (symbolTable->DoesSymbolExist(id, procedureCall))
     {
-        while (IsDeclaration(isProcDeclaration))
+        if (procedureCall.declarationType == T_PROCEDURE)
         {
-            if (isProcDeclaration)
-            {
-                if (!ValidateToken(T_SEMICOLON))
-                {
-                    ReportError("Expected ';' after procedure declaration");
-                }
-            }
-            else if (!ValidateToken(T_SEMICOLON))
-            {
-                ReportError("Expected ';' after variable declaration");
-            }
-        }
-
-        if (ValidateToken(T_BEGIN))
-        {
-            while (true)
-            {
-                while (IsStatement())
-                {
-                    if (!ValidateToken(T_SEMICOLON))
-                    {
-                        ReportError("Expected ';' after statement in procedure");
-                    }
-                }
-
-                if (ValidateToken(T_END))
-                {
-                    if (ValidateToken(T_PROCEDURE))
-                    {
-                        return true;
-                    }
-                    else
-                    {
-                        ReportError("Expected 'end procedure' at end of procedure declaration"); // TODO: Change msg
-                        return true; // TODO: Treat this as a warning?
-                    }
-                }
-                else
-                {
-                    ReportError("Expected 'end procedure' at the end of procedure declaration");
-                    return false;
-                }
-            }
+            if (ValidateToken(T_IDENTIFIER));
+            else return false;
         }
         else
         {
-            ReportError("Could not find valid declaration or 'begin' keyword in procedure body"); // TODO: Modify
+            // todo: error msg?
             return false;
         }
     }
+    else
+    {
+        ReportError(id + " is not defined in the current scope"); // todo: msg
+    }
+
+    size = procedureCall.size;
+    type = procedureCall.type;
+
+    if (ValidateToken(T_LPAREN))
+    {
+        IsArgumentList(parameterList, procedureCall);
+        if (!ValidateToken(T_RPAREN))
+        {
+            ReportError("Expected ')' following procedure arguments"); // TODO: msg
+        }
+        else
+        {
+            return true; // TODO: ???
+        }
+    }
+    else
+    {
+        ReportError("Expected '(' following procedure call"); // TODO: message
+    }
+
+    return false;
 }
 
-bool Parser::TypeCheck()
+bool Parser::IsArgumentList(std::vector<Symbol> &parameterList, Symbol &procedureCall)
+{
+    parameterList.clear(); // Ensure parameterList is empty to begin with
+
+    Symbol param;
+    param.parameters.clear();
+
+    std::vector<Symbol>::iterator it = procedureCall.parameters.begin();
+    if (it == procedureCall.parameters.end())
+    {
+        // Not found
+        return false;
+    }
+
+    if (IsExpression(param.size, param.type))
+    {
+        // TODO: code gen
+        ++it;
+        parameterList.push_back(param);
+        while (ValidateToken(T_COMMA))
+        {
+            if (it == procedureCall.parameters.end())
+            {
+                // Not Found
+                return false;
+            }
+
+            if (IsExpression(param.size, param.type))
+            {
+                parameterList.push_back(param);
+                // TODO: code gen
+                ++it;
+            }
+            else
+            {
+                ReportError("Expected an additional argument after ',' in argument list");
+            }
+        }
+    }
+
+    return true;
+}
+
+bool Parser::TypeCheck(int &type)
 {
     if (ValidateToken(T_INTEGER) ||
         ValidateToken(T_FLOAT) ||
@@ -804,20 +968,21 @@ bool Parser::TypeCheck()
         ValidateToken(T_STRING) ||
         ValidateToken(T_ENUM))
     {
+        type = token->type;
         return true;
     }
 
     return false;
 }
 
-bool Parser::IsValidAssignment(std::string &id, bool &isFound, bool &isGlobal, Node &n, int &checkSize, int &checkType)
+bool Parser::IsValidAssignment(std::string &id, bool &isFound, bool &isGlobal, Symbol &symbol, int &checkSize, int &checkType)
 {
     int size, type;
 
     if (IsIdentifier(id))
     {
-        isFound = symbolTable->DoesSymbolExist(id, isGlobal, n);
-        if (isFound && n.type == T_PROCEDURE)
+        isFound = symbolTable->DoesSymbolExist(id, symbol);
+        if (isFound && symbol.declarationType == T_PROCEDURE)
         {
             return false;
         }
@@ -829,12 +994,35 @@ bool Parser::IsValidAssignment(std::string &id, bool &isFound, bool &isGlobal, N
         }
         else
         {
-            checkSize = n.size;
-            checkType = n.type;
+            checkSize = symbol.size;
+            checkType = symbol.type;
         }
 
-        // TODO: Arrays
-//        if (ValidateToken(T_LBRACKET)) {}
+        if (ValidateToken(T_LBRACKET))
+        {
+            if (IsExpression(size, type))
+            {
+                if (size != 0 || ((type != T_FLOAT) && (type != T_INTEGER) && (type != T_BOOL)))
+                {
+                    ReportError("Index must be a numerical value");
+                }
+                else
+                {
+                    checkSize = 0;
+                }
+
+                if (ValidateToken(T_RBRACKET))
+                {
+                    return true;
+                }
+                else
+                {
+                    ReportError("Expected numerical expression for array index");
+                    return true;
+                }
+            }
+        }
+
         return true;
     }
 
@@ -932,6 +1120,7 @@ bool Parser::IsArithOpPrime(int &size, int &type)
 
     std::string op = token->str; // for code gen
 
+    // TODO: fix this up
     if (ValidateToken(T_ADD));
     else if (ValidateToken(T_SUBTRACT));
     else return false;
@@ -981,7 +1170,7 @@ bool Parser::IsRelationPrime(int &size, int &type)
     int termSize, termType;
     std::string op = token->str; // for code gen
 
-    if (ValidateToken(T_LESSTHAN) || ValidateToken(T_GREATERTHAN) || ValidateToken(T_LTEQ) || ValidateToken(T_GTEQ))
+    if (ValidateToken(T_LESSTHAN) || ValidateToken(T_GREATERTHAN) || ValidateToken(T_LTEQ) || ValidateToken(T_GTEQ) || ValidateToken(T_EQEQ))
     {
         if (IsTerm(termSize, termType))
         {
@@ -1062,6 +1251,7 @@ bool Parser::IsTermPrime(int &size, int &type)
 bool Parser::IsFactor(int &size, int &type)
 {
     int tempSize, tempType;
+    std::string id;
 
     if (ValidateToken(T_LPAREN))
     {
@@ -1082,6 +1272,12 @@ bool Parser::IsFactor(int &size, int &type)
         {
             ReportError("Expected expression in parenthesis"); // TODO: msg / fatal error
         }
+    }
+    else if (IsProcedureCall(id, tempSize, tempType))
+    {
+        size = tempSize;
+        type = tempType;
+        return true;
     }
     else if (ValidateToken(T_SUBTRACT))
     {
@@ -1166,21 +1362,21 @@ bool Parser::IsName(int &size, int &type)
 {
     std::string id;
     bool isGlobal;
-    Node n;
+    Symbol symbol;
 
     if (IsIdentifier(id))
     {
-        bool isFound = symbolTable->DoesSymbolExist(id, isGlobal, n);
+        bool isFound = symbolTable->DoesSymbolExist(id, symbol);
         if (isFound)
         {
-            if (n.type == T_PROCEDURE)
+            if (symbol.declarationType == T_PROCEDURE)
             {
                 ReportError(id + " is not a variable in this scope"); // todo: msg
             }
             else
             {
-                size = n.size;
-                type = n.type;
+                size = symbol.size;
+                type = symbol.type;
             }
         }
         else
@@ -1190,10 +1386,42 @@ bool Parser::IsName(int &size, int &type)
             type = T_UNKNOWN;
         }
 
-        // TODO: implement array stuff
-//        if (ValidateToken(T_LBRACKET)) {}
+        if (ValidateToken(T_LBRACKET))
+        {
+            if (symbol.size == 0 && symbol.declarationType != T_PROCEDURE)
+            {
+                ReportError(id + " is not an array"); // todo: msg
+            }
 
-        return true;
+            int arrSize, arrType;
+            if (IsExpression(arrSize, arrType))
+            {
+                if ((arrSize > 1) || ((arrType != T_INTEGER) && (arrType != T_FLOAT) && (arrType != T_BOOL)))
+                {
+                    ReportError("Array index must be a numerical value");
+                }
+
+                size = 0;
+                if (ValidateToken(T_RBRACKET))
+                {
+                    // code gen stuff
+                    return true;
+                }
+                else
+                {
+                    ReportError("Expected ']' after expression");
+                }
+            }
+            else
+            {
+                ReportError("Expected expression between brackets"); // todo: msg
+            }
+
+        }
+        else
+        {
+            return true;
+        }
     }
 
     return false;

@@ -1,21 +1,13 @@
 program test_program is
-    global variable x : integer;
-    global variable i : integer;
-    global variable j : integer;
-
-    procedure testProc : integer(variable x : integer)
-        variable b : integer;
-        variable y : integer;
-    begin
-        b := 3;
-        y := b;
-    end procedure;
+    global variable z : integer[2];
+    variable x : bool[10];
+    global variable y : integer;
+    global variable A : float[1];
 begin
-    // call testProc
-    x := 3;
-
-    for (i := 0; i < x)
-    	j := x + i;
-    end for;
-
+    y := 1;
+    // A[0] := false; // error
+    x[0] := 1;
+    x[1] := 0;
+    x[2] := 1;
+    z[0] := x;
 end program.

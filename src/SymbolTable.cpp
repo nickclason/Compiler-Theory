@@ -7,110 +7,150 @@
 
 SymbolTable::SymbolTable()
 {
-    currScope = 0;
-}
-
-SymbolTable::~SymbolTable()
-{
-
+    scope = 0;
 }
 
 void SymbolTable::AddScope()
 {
-    if (symTableScopes.size() > 0)
+    if (scopes.size() > 0)
     {
-        currScope++;
+        scope++;
     }
 
-    std::map<std::string, Node> symbolTable;
-    symTableScopes.push_back(symbolTable);
+    std::map<std::string, Symbol> newScope;
+    scopes.push_back(newScope);
 }
 
 void SymbolTable::RemoveScope()
 {
-    symTableScopes.pop_back();
-    currScope--;
+    scopes.pop_back();
+    scope--;
 }
 
-//void SymbolTable::ChangeScope(int scope)
-//{
-//
-//}
-
-bool SymbolTable::AddSymbol(std::string id, int type, std::vector<Node> args, bool isGlobal)
+bool SymbolTable::AddSymbol(Symbol symbol)
 {
-    it = symTableScopes[0].find(id);
-    if (it != symTableScopes[0].end() && symTableScopes[0][id].isGlobal)
+    it = scopes[0].find(symbol.id); // Look for this symbol in the Global scope first
+    if (it != scopes[0].end() && scopes[0][symbol.id].isGlobal)
     {
-        // TODO: throw some kind of error??
+        // This symbol has already been defined in the global scope
+        // therefore we cannot add it again in the same scope.
+        //
         return false;
     }
     else
     {
-        it = symTableScopes.back().find(id);
-        if (it != symTableScopes.back().end())
+        it = scopes.back().find(symbol.id);
+        if (it != scopes.back().end())
         {
-            // TODO: throw some kind of error??
+            // This symbol has already been defined in the current scope
+            // and cannot be defined again within the same scope.
+            //
             return false;
         }
         else
         {
-            Node newNode;
-            newNode.id = id;
-            newNode.size = 0;
-            newNode.scope = currScope;
-            newNode.isGlobal = isGlobal;
-            newNode.type = type;
-            newNode.args = args;
+            // If we get here, then the symbol can be defined for the current scope
+            //
+            scopes.back().insert(std::pair<std::string, Symbol>(symbol.id, symbol));
+            return true;
+        }
+    }
 
-            // TODO: remove
-//            std::pair <std::map<std::string, Node>::iterator, bool> res;
-//            res = symTableScopes.back().insert(std::pair<std::string, Node>(id, newNode));
-            symTableScopes.back().insert(std::pair<std::string, Node>(id, newNode));
+}
 
-            if (type == T_PROCEDURE)
-            {
-                symTableScopes.end()[-2].insert(std::pair<std::string, Node>(id, newNode));
-            }
+bool SymbolTable::AddSymbolToScope(Symbol symbol, int scope)
+{
+    it = scopes[0].find(symbol.id); // Look for this symbol in the Global scope first
+    if (it != scopes[0].end() && scopes[0][symbol.id].isGlobal)
+    {
+        // This symbol has already been defined in the global scope
+        // therefore we cannot add it again in the same scope.
+        //
+        return false;
+    }
+    else
+    {
+        it = scopes[scope].find(symbol.id);
+        if (it != scopes[scope].end())
+        {
+            // This symbol has already been defined in the scope
+            // and cannot be defined again within the same scope.
+            //
+            return false;
+        }
+        else
+        {
+            // If we get here, then the symbol can be defined for the scope
+            //
+            scopes[scope].insert(std::pair<std::string, Symbol>(symbol.id, symbol));
+            return true;
         }
     }
 }
 
-bool SymbolTable::AddSymbolToParentScope(std::string id, int type, std::vector<Node> args, bool isGlobal)
+bool SymbolTable::DoesSymbolExist(std::string &id, Symbol &symbol)
 {
-    return false;
-}
-
-bool SymbolTable::DoesSymbolExist(std::string id, bool &isGlobal, Node &n)
-{
-    int type = T_UNKNOWN;
-    it = symTableScopes[currScope].find(id);
-
-    if (it != symTableScopes[currScope].end())
+    it = scopes[scope].find(id);
+    if (it != scopes[scope].end())
     {
-        isGlobal = false; // TODO: I think?
-        n = it->second;
+        // The symbol was found in the current scope
+        symbol = it->second;
         return true;
     }
 
-    it = symTableScopes[0].find(id); // Global Scope
-    if (it != symTableScopes[0].end() && symTableScopes[0][id].isGlobal) // In global scope and declared as global
+    it = scopes[0].find(id); // Look for this symbol in the Global scope
+    if (it != scopes[0].end() && scopes[0][id].isGlobal)
     {
-        isGlobal = true;
-        n = it->second;
+        // The symbol was found in the Global scope
+        symbol = it->second;
         return true;
     }
 
-    // TODO: throw some kind of "undeclared identifier error"
+    // Symbol not found
     return false;
 }
 
-int SymbolTable::getScope()
+int SymbolTable::GetScope()
 {
-    return currScope;
+    return scope;
+}
+
+void SymbolTable::SetScope(int &scope)
+{
+    this->scope = scope;
 }
 
 void SymbolTable::PrintScopes()
 {
-    return;
+    int i = 0;
+    for (auto &scope : scopes)
+    {
+        printf("Scope: %i\n", i);
+        for (auto symbol : scope)
+        {
+            std::cout << "\t{ID: " << symbol.first << ", Type: " << symbol.second.type << ", DeclType: " << symbol.second.declarationType << "}" << std::endl;
+        }
+        std::cout << std::endl;
+        i++;
+    }
 }
+
+void SymbolTable::PrintScope(int idx)
+{
+    std::map<std::string, Symbol> scope;
+    try
+    {
+        scope = scopes[idx];
+    }
+    catch (int e)
+    {
+        std::cout << "Exception occured: " << e << std::endl;
+    }
+
+    for (auto symbol : scope)
+    {
+        std::cout << "{ID: " << symbol.first << ", Type: " << symbol.second.type << ", DeclType: " << symbol.second.declarationType << "}" << std::endl;
+    }
+}
+
+

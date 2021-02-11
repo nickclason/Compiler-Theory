@@ -14,16 +14,35 @@
 //       Update variables, add new info
 //       Type checking
 
-struct Node
+struct Symbol
 {
-    int type;
-    int size; // size of arrays, 0 for anything that's not an array?
-    int scope; // not sure about this
-
-    bool isGlobal;
+    int type;               // int, float, bool, enum, string
+    int declarationType;    // variable declaration, procedure declaration, enum declaration
+    int size;               // size of arrays, 0 non-arrays
+    bool isGlobal;          // True if this symbol is in the global scope; false otherwise
 
     std::string id;
-    std::vector<Node> args;
+    std::vector<Symbol> parameters; // For procedures
+
+    Symbol()
+    {
+        type = -1;
+        declarationType = -1;
+        size = -1;
+        isGlobal = false;
+        id = "";
+        parameters = std::vector<Symbol>();
+    }
+
+    Symbol(int &type_, int &decType_, int &size_, bool isGlobal_, std::string &id_, std::vector<Symbol> parameters_)
+    {
+        type = type_;
+        declarationType = decType_;
+        size = size_;
+        isGlobal = isGlobal_;
+        id = id_;
+        parameters = parameters_;
+    }
 };
 
 
@@ -32,27 +51,28 @@ class SymbolTable {
     public:
 
         SymbolTable();
-        ~SymbolTable();
 
         void AddScope();
         void RemoveScope();
 
-        bool AddSymbol(std::string id, int type, std::vector<Node> args, bool isGlobal); // maybe make this bool
-        bool AddSymbolToParentScope(std::string id, int type, std::vector<Node> args, bool isGlobal); // maybe make this bool
-        bool DoesSymbolExist(std::string id, bool &isGlobal, Node &n);
+        bool AddSymbol(Symbol symbol);
+        bool AddSymbolToScope(Symbol symbol, int scope);
+        bool DoesSymbolExist(std::string &id, Symbol &symbol);
 
-        int getScope();
-
-
-    private:
-        int currScope;
-        std::vector<std::map<std::string, Node> > symTableScopes;
-        std::map<std::string, Node>::iterator it;
+        int GetScope();
+        void SetScope(int &scope);
 
         // Debug Methods
         void PrintScopes();
-        //void ChangeScope(int scope);
-};
+        void PrintScope(int idx);
 
+    private:
+        int scope;
+        std::vector<std::map<std::string, Symbol> > scopes;
+        std::map<std::string, Symbol>::iterator it;
+
+
+
+};
 
 #endif //COMPILER_THEORY_SYMBOLTABLE_H

@@ -68,7 +68,7 @@
 
 // Miscellaneous
 //
-#define T_IDENTIFIER     300      // User identifier
+#define T_IDENTIFIER     300      // identifier
 #define T_INT_LITERAL    301      // integer literal
 #define T_FLOAT_LITERAL  302      // float literal
 #define T_STRING_LITERAL 303      // string literal
