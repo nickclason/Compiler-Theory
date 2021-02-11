@@ -13,6 +13,9 @@
 // TODO: Get/Put int, float, bool, string, etc. These are for the runtime env, but also I think technically could be
 //       defined in the global scope?
 
+// TODO: When multiple scopes are created at the top level, lookup does not work very well.
+//       Need to improve how scopes are checked/switched to/managed
+
 Parser::Parser(token_t *tokenPtr, Scanner *scannerPtr, SymbolTable* symbolTablePtr)
 {
     token = tokenPtr; // TODO: Might be able to remove tokenPtr parameter with some future changes
@@ -71,9 +74,7 @@ void Parser::Program()
 
     if (ValidateToken(T_EOF))
     {
-        // TODO: Exit scope, I dont think i really need to do anything explicitly to exit this scope?
-        //       We do have SetScope method if needed.
-        return;
+        symbolTable->ExitScope();
     }
     else
     {
@@ -86,9 +87,10 @@ bool Parser::ProgramHeader()
     // TODO: Rewrite/Cleanup/Optimize
     if (ValidateToken(T_PROGRAM))
     {
-        std::string ident;
-        if (IsIdentifier(ident))
+        std::string id;
+        if (IsIdentifier(id))
         {
+            symbolTable->ChangeScopeName(id);
             if (ValidateToken(T_IS))
             {
                 return true;
@@ -136,8 +138,6 @@ bool Parser::ProgramBody()
         {
             while (true)
             {
-                int scope = 0;
-                symbolTable->SetScope(scope); // I think it is acceptable to set the scope to 0 (global scope) here in the program body
                 while (IsStatement())
                 {
                     if (!ValidateToken(T_SEMICOLON))
@@ -287,16 +287,15 @@ bool Parser::IsDeclaration(bool &isProcedureDec)
 
     if (IsProcedureDeclaration(symbol, isGlobal))
     {
-        int scope = symbolTable->GetScope() - 1;
-        symbolTable->AddSymbolToScope(symbol, scope); // In addition to adding the proc to its own scope, add it to the scope 1 higher as well.
-        symbolTable->SetScope(scope);
+        symbolTable->ExitScope();
+        symbolTable->AddSymbol(symbol.id, symbol, isGlobal);
         isProcedureDec = true;
 
         return true;
     }
     else if (IsVariableDeclaration(symbol, isGlobal))
     {
-        symbolTable->AddSymbol(symbol);
+        symbolTable->AddSymbol(symbol.id, symbol, isGlobal);
         return true;
     }
     else if (isGlobal)
@@ -336,6 +335,7 @@ bool Parser::IsProcedureHeader(Symbol &symbol, bool isGlobal)
         symbolTable->AddScope(); // Add new scope for the procedure
         if (IsIdentifier(id))
         {
+            symbolTable->ChangeScopeName(id);
             if (ValidateToken(T_COLON))
             {
                 if (TypeCheck(type))
@@ -355,7 +355,7 @@ bool Parser::IsProcedureHeader(Symbol &symbol, bool isGlobal)
                         symbol.size = size;
                         symbol.isGlobal = isGlobal;
                         symbol.id = id;
-                        symbolTable->AddSymbol(symbol); // This is to make recursion possible
+                        symbolTable->AddSymbol(id, symbol, isGlobal); // This is to make recursion possible
 
                         return true;
                     }
@@ -412,7 +412,7 @@ bool Parser::IsParameter(Symbol &symbol)
     {
         // Add the parameter to the procedures scope and to the procedures symbol
         //
-        symbolTable->AddSymbol(newParameter);
+        symbolTable->AddSymbol(newParameter.id, newParameter, false);
         symbol.parameters.push_back(newParameter);
 
         return true;
@@ -876,7 +876,7 @@ bool Parser::IsProcedureCall(std::string &id, int &size, int &type)
         return false;
     }
 
-    if (symbolTable->DoesSymbolExist(id, procedureCall))
+    if (symbolTable->DoesSymbolExist(id, procedureCall, isGlobal))
     {
         if (procedureCall.declarationType == T_PROCEDURE)
         {
@@ -981,7 +981,7 @@ bool Parser::IsValidAssignment(std::string &id, bool &isFound, bool &isGlobal, S
 
     if (IsIdentifier(id))
     {
-        isFound = symbolTable->DoesSymbolExist(id, symbol);
+        isFound = symbolTable->DoesSymbolExist(id, symbol, isGlobal);
         if (isFound && symbol.declarationType == T_PROCEDURE)
         {
             return false;
@@ -1366,7 +1366,7 @@ bool Parser::IsName(int &size, int &type)
 
     if (IsIdentifier(id))
     {
-        bool isFound = symbolTable->DoesSymbolExist(id, symbol);
+        bool isFound = symbolTable->DoesSymbolExist(id, symbol, isGlobal);
         if (isFound)
         {
             if (symbol.declarationType == T_PROCEDURE)

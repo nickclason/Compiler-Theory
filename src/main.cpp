@@ -55,38 +55,6 @@ void PeekTest(std::string fileName)
         i++;
     }
 }
-/*
-void SymbolTableTest()
-{
-    SymbolTable* symbolTable = new SymbolTable();
-
-    Symbol s = {T_INTEGER, T_VARIABLE, 0, true, "X", std::vector<Symbol>()};
-    Symbol s1 = {T_INTEGER, T_PROCEDURE, 0, true, "myProc", std::vector<Symbol>()};
-    Symbol s2 = {T_BOOL, T_VARIABLE, 0, false, "isValid", std::vector<Symbol>()};
-    Symbol s3 = {T_BOOL, T_VARIABLE, 0, false, "isValid", std::vector<Symbol>()};
-
-    symbolTable->AddScope();
-    symbolTable->AddSymbol(s);
-    symbolTable->AddSymbol(s1);
-
-    symbolTable->AddScope();
-    symbolTable->AddSymbol(s3);
-
-    symbolTable->AddScope();
-    symbolTable->AddSymbol(s2);
-
-    std::cout << "Printing all scopes: " << std::endl;
-    symbolTable->PrintScopes();
-
-    std::cout << "Printing global scope: " << std::endl;
-    symbolTable->PrintScope(0);
-}
-*/
-//void ParserTest(std::string fileName)
-//{
-//}
-
-
 
 int main()
 {

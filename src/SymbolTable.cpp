@@ -7,150 +7,109 @@
 
 SymbolTable::SymbolTable()
 {
-    scope = 0;
+    curr = nullptr;
+    prev = nullptr;
+    top = nullptr;
+}
+
+SymbolTable::~SymbolTable()
+{
 }
 
 void SymbolTable::AddScope()
 {
-    if (scopes.size() > 0)
+    if (curr != nullptr)
     {
-        scope++;
-    }
-
-    std::map<std::string, Symbol> newScope;
-    scopes.push_back(newScope);
-}
-
-void SymbolTable::RemoveScope()
-{
-    scopes.pop_back();
-    scope--;
-}
-
-bool SymbolTable::AddSymbol(Symbol symbol)
-{
-    it = scopes[0].find(symbol.id); // Look for this symbol in the Global scope first
-    if (it != scopes[0].end() && scopes[0][symbol.id].isGlobal)
-    {
-        // This symbol has already been defined in the global scope
-        // therefore we cannot add it again in the same scope.
-        //
-        return false;
+        Scope *temp = curr;
+        curr = new Scope();
+        curr->prevScope = temp;
     }
     else
     {
-        it = scopes.back().find(symbol.id);
-        if (it != scopes.back().end())
-        {
-            // This symbol has already been defined in the current scope
-            // and cannot be defined again within the same scope.
-            //
-            return false;
-        }
-        else
-        {
-            // If we get here, then the symbol can be defined for the current scope
-            //
-            scopes.back().insert(std::pair<std::string, Symbol>(symbol.id, symbol));
-            return true;
-        }
+        // New Global Scope
+        curr = new Scope();
+        curr->prevScope = nullptr;
+        top = curr;
     }
-
 }
 
-bool SymbolTable::AddSymbolToScope(Symbol symbol, int scope)
+void SymbolTable::ExitScope()
 {
-    it = scopes[0].find(symbol.id); // Look for this symbol in the Global scope first
-    if (it != scopes[0].end() && scopes[0][symbol.id].isGlobal)
+    if (curr != nullptr)
     {
-        // This symbol has already been defined in the global scope
-        // therefore we cannot add it again in the same scope.
-        //
+        curr->PrintScope();
+        Scope* temp = curr;
+        curr = curr->prevScope;
+        delete temp;
+    }
+}
+
+bool SymbolTable::AddSymbol(std::string id, Symbol symbol, bool isGlobal)
+{
+    if (curr != nullptr)
+    {
+        if (!curr->DoesSymbolExist(id, false))
+        {
+            curr->AddSymbol(symbol);
+            return true;
+        }
+
         return false;
     }
-    else
-    {
-        it = scopes[scope].find(symbol.id);
-        if (it != scopes[scope].end())
-        {
-            // This symbol has already been defined in the scope
-            // and cannot be defined again within the same scope.
-            //
-            return false;
-        }
-        else
-        {
-            // If we get here, then the symbol can be defined for the scope
-            //
-            scopes[scope].insert(std::pair<std::string, Symbol>(symbol.id, symbol));
-            return true;
-        }
-    }
-}
 
-bool SymbolTable::DoesSymbolExist(std::string &id, Symbol &symbol)
-{
-    it = scopes[scope].find(id);
-    if (it != scopes[scope].end())
-    {
-        // The symbol was found in the current scope
-        symbol = it->second;
-        return true;
-    }
-
-    it = scopes[0].find(id); // Look for this symbol in the Global scope
-    if (it != scopes[0].end() && scopes[0][id].isGlobal)
-    {
-        // The symbol was found in the Global scope
-        symbol = it->second;
-        return true;
-    }
-
-    // Symbol not found
     return false;
 }
 
-int SymbolTable::GetScope()
+bool SymbolTable::AddSymbolToPrevScope(std::string id, Symbol symbol, bool isGlobal)
 {
-    return scope;
-}
-
-void SymbolTable::SetScope(int &scope)
-{
-    this->scope = scope;
-}
-
-void SymbolTable::PrintScopes()
-{
-    int i = 0;
-    for (auto &scope : scopes)
+    Scope* previousScope = curr->prevScope;
+    if (previousScope != nullptr) // Only if a higher scope exists
     {
-        printf("Scope: %i\n", i);
-        for (auto symbol : scope)
+        if (!previousScope->DoesSymbolExist(id, false))
         {
-            std::cout << "\t{ID: " << symbol.first << ", Type: " << symbol.second.type << ", DeclType: " << symbol.second.declarationType << "}" << std::endl;
+            previousScope->AddSymbol(symbol);
+            return true;
         }
-        std::cout << std::endl;
-        i++;
+
+        return false;
     }
+    return false;
 }
 
-void SymbolTable::PrintScope(int idx)
+bool SymbolTable::DoesSymbolExist(std::string id, Symbol &symbol, bool &isGlobal)
 {
-    std::map<std::string, Symbol> scope;
-    try
+    if (curr == nullptr)
     {
-        scope = scopes[idx];
-    }
-    catch (int e)
-    {
-        std::cout << "Exception occured: " << e << std::endl;
+        // No scope to search
+        return false;
     }
 
-    for (auto symbol : scope)
+    bool isFound = curr->DoesSymbolExist(id, false);
+    if (isFound)
     {
-        std::cout << "{ID: " << symbol.first << ", Type: " << symbol.second.type << ", DeclType: " << symbol.second.declarationType << "}" << std::endl;
+        isGlobal = false;
+        symbol = curr->GetSymbol(id);
+        return true;
     }
+    else
+    {
+        isFound = top->DoesSymbolExist(id, true);
+        if (isFound)
+        {
+            isGlobal = true;
+            symbol = top->GetSymbol(id);
+            return true;
+        }
+
+        return false;
+    }
+
+    return false;
+}
+
+void SymbolTable::ChangeScopeName(std::string id)
+{
+    curr->SetName(id);
 }
 
 

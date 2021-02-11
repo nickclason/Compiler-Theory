@@ -7,6 +7,7 @@
 
 #include "../include/definitions.h"
 #include "../include/Scanner.h"
+#include "../include/Symbol.h"
 #include "../include/SymbolTable.h"
 
 #include <queue>
