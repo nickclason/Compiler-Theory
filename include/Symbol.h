@@ -13,7 +13,7 @@
 struct Symbol
 {
     int type;               // int, float, bool, enum, string
-    int declarationType;    // variable declaration, procedure declaration, enum declaration
+    int declarationType;    // variable declaration, procedure declaration, or user type declaration
     int size;               // size of arrays, 0 non-arrays
     bool isGlobal;          // True if this symbol is in the global scope; false otherwise
 

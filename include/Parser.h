@@ -55,6 +55,7 @@ class Parser {
 
         bool IsDeclaration(bool &isProcedureDec);
         bool IsVariableDeclaration(Symbol &symbol, bool isGlobal);
+        bool IsTypeDelaration(Symbol &symbol, bool isGlobal);
         bool IsProcedureDeclaration(Symbol &symbol, bool isGlobal);
         bool IsProcedureHeader(Symbol &symbol, bool isGlobal);
         bool IsProcedureBody();

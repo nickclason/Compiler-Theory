@@ -307,6 +307,11 @@ bool Parser::IsDeclaration(bool &isProcedureDec)
     return false;
 }
 
+bool Parser::IsTypeDelaration(Symbol &symbol, bool isGlobal)
+{
+    return false;
+}
+
 bool Parser::IsProcedureDeclaration(Symbol &symbol, bool isGlobal)
 {
     if (IsProcedureHeader(symbol, isGlobal))
@@ -487,62 +492,118 @@ bool Parser::IsVariableDeclaration(Symbol &symbol, bool isGlobal)
     int type, size;
 
     // TODO: Enum/user type support
-    if (isGlobal)
+
+    if (ValidateToken(T_VARIABLE))
     {
-        if (ValidateToken(T_VARIABLE))
+        if (ValidateToken(T_IDENTIFIER))
         {
-            if (ValidateToken(T_IDENTIFIER))
+            id = token->str;
+            if (ValidateToken(T_COLON))
             {
-                id = token->str;
-                if (ValidateToken(T_COLON))
+                if (TypeCheck(type))
                 {
-                    if (TypeCheck(type))
+                    if (ValidateToken(T_LBRACKET))
                     {
-                        if (ValidateToken(T_LBRACKET))
+                        if (ValidateToken(T_INTEGER) || ValidateToken(T_INT_LITERAL)) // I would assume anything that EVALUATES to an int could go here (i.e. ffunction call)?
                         {
-                            if (ValidateToken(T_INTEGER) || ValidateToken(T_INT_LITERAL)) // I would assume anything that EVALUATES to an int could go here (i.e. ffunction call)?
+                            size = token->val.intValue;
+                            if (!ValidateToken(T_RBRACKET))
                             {
-                                size = token->val.intValue;
-                                if (!ValidateToken(T_RBRACKET))
-                                {
-                                    ReportError("Expected ']' at end of array declaration");
-                                }
+                                ReportError("Expected ']' at end of array declaration");
                             }
+                        }
+                    }
+                    else if (type == T_ENUM)
+                    {
+                        symbol.id = id;
+                        symbol.type = T_ENUM;
+                        symbol.declarationType = T_ENUM_DEC;
+                        symbol.size = size;
+                        symbol.isGlobal = isGlobal;
+                        symbol.parameters = std::vector<Symbol>();
+
+                        if (ValidateToken(T_LBRACE))
+                        {
+                            Symbol enumSym;
+                            std::string enumIdentifier;
+
+                            IsIdentifier(enumIdentifier);
+                            enumSym.id = enumIdentifier;
+                            enumSym.type = T_INTEGER;
+                            enumSym.declarationType = T_ENUM_DEC;
+                            enumSym.size = 0;
+                            enumSym.isGlobal = symbol.isGlobal;
+
+                            symbolTable->AddSymbol(enumIdentifier, enumSym, enumSym.isGlobal);
+
+                            while (ValidateToken(T_COMMA))
+                            {
+                                IsIdentifier(enumIdentifier);
+                                enumSym = Symbol();
+                                enumSym.id = enumIdentifier;
+                                enumSym.isGlobal = symbol.isGlobal;
+                                enumSym.type = T_INTEGER;
+                                enumSym.declarationType = T_ENUM_DEC;
+
+                                symbolTable->AddSymbol(enumIdentifier, enumSym, enumSym.isGlobal);
+                            }
+
+                            if (!ValidateToken(T_RBRACE))
+                            {
+                                ReportError("Expected }");
+//                                return false;
+                            }
+
+                            return true;
                         }
                         else
                         {
-                            size = 0;
+                            ReportError("Expected '{' after enum type declaration");
+//                            return false;
                         }
-
-
-                        symbol.id = id;
-                        symbol.type = type;
-                        symbol.declarationType = T_VARIABLE;
-                        symbol.size = size;
-                        symbol.isGlobal = isGlobal; // This should always be true in this spot in the code
-                        symbol.parameters = std::vector<Symbol>(); // Variables should not have parameters
-                        return true;
                     }
                     else
                     {
-                        ReportError("TYPE expected after ':'");
+                        size = 0;
                     }
+
+
+                    symbol.id = id;
+                    symbol.type = type;
+                    symbol.declarationType = T_VARIABLE;
+                    symbol.size = size;
+                    symbol.isGlobal = isGlobal;
+                    symbol.parameters = std::vector<Symbol>(); // Variables should not have parameters
+                    return true;
                 }
                 else
                 {
-                    ReportError("Expected ':' after identifier");
+                    ReportError("TYPE expected after ':'");
                 }
             }
             else
             {
-                ReportError("Expected identifier after 'variable' keyword");
+                ReportError("Expected ':' after identifier");
             }
         }
         else
         {
-            ReportError("Expected 'variable' keyword after global identifier");
+            ReportError("Expected identifier after 'variable' keyword");
         }
     }
+    else
+    {
+        if (isGlobal)
+        {
+            ReportError("Expected 'variable' keyword after global identifier");
+        }
+        else
+        {
+            return false;
+        }
+
+    }
+    /*
     else // i think this could be made else if(T_VARIABLE)
     {
         if (ValidateToken(T_VARIABLE))
@@ -596,7 +657,7 @@ bool Parser::IsVariableDeclaration(Symbol &symbol, bool isGlobal)
         {
             return false;
         }
-    }
+    }*/
 
     return false;
 }

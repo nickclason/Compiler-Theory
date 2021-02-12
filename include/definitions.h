@@ -64,6 +64,7 @@
 #define T_STRING         297     // "STRING"
 #define T_BOOL           298     // "BOOL"
 #define T_ENUM           299     // "ENUM"
+#define T_ENUM_DEC       307     // enum declaration
 
 
 // Miscellaneous
