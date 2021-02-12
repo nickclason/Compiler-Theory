@@ -8,17 +8,13 @@
 //      resync???????                   -
 //      Might need a larger error class -
 
-// TODO: enums/custom type declarations
-
 // TODO: Get/Put int, float, bool, string, etc. These are for the runtime env, but also I think technically could be
 //       defined in the global scope?
 
-// TODO: When multiple scopes are created at the top level, lookup does not work very well.
-//       Need to improve how scopes are checked/switched to/managed
 
 Parser::Parser(token_t *tokenPtr, Scanner *scannerPtr, SymbolTable* symbolTablePtr)
 {
-    token = tokenPtr; // TODO: Might be able to remove tokenPtr parameter with some future changes
+    token = tokenPtr;
     scanner = scannerPtr;
     symbolTable = symbolTablePtr;
     errorFlag = false;
@@ -298,9 +294,14 @@ bool Parser::IsDeclaration(bool &isProcedureDec)
         symbolTable->AddSymbol(symbol.id, symbol, isGlobal);
         return true;
     }
+    else if (IsTypeDelaration(symbol, isGlobal))
+    {
+        symbolTable->AddSymbol(symbol.id, symbol, isGlobal);
+        return true;
+    }
     else if (isGlobal)
     {
-        ReportError("Bad Line. Expected either a valid procedure or variable declaration of 'global' keyword"); // TODO: Change msg
+        ReportError("Bad Line. Expected a valid procedure, variable declaration, or type declaration after 'global' keyword"); // TODO: Change msg
         return false;
     }
 
@@ -309,6 +310,41 @@ bool Parser::IsDeclaration(bool &isProcedureDec)
 
 bool Parser::IsTypeDelaration(Symbol &symbol, bool isGlobal)
 {
+    int typeType;
+    std::string typeID;
+
+    if (ValidateToken(T_TYPE))
+    {
+        if (IsIdentifier(typeID))
+        {
+            if (ValidateToken(T_IS))
+            {
+                if (TypeCheck(typeType))
+                {
+                    symbol.id = typeID;
+                    symbol.type = typeType;
+                    symbol.declarationType = T_TYPE;
+                    symbol.size = 0;
+                    symbol.isGlobal = isGlobal;
+                    symbol.parameters = std::vector<Symbol>();
+                    return true;
+                }
+                else
+                {
+                    ReportError("Expected a type after 'is' keyword in type declaration");
+                }
+            }
+            else
+            {
+                ReportError("Expected 'is' after identifier in type declaration");
+            }
+        }
+        else
+        {
+            ReportError("Expected identifier after 'TYPE' keyword");
+        }
+    }
+
     return false;
 }
 
@@ -491,7 +527,7 @@ bool Parser::IsVariableDeclaration(Symbol &symbol, bool isGlobal)
     std::string id;
     int type, size;
 
-    // TODO: Enum/user type support
+    // TODO: user type support
 
     if (ValidateToken(T_VARIABLE))
     {
@@ -524,6 +560,8 @@ bool Parser::IsVariableDeclaration(Symbol &symbol, bool isGlobal)
 
                         if (ValidateToken(T_LBRACE))
                         {
+
+                            // TODO: Need a way to assign values to the identifiers within the enum
                             Symbol enumSym;
                             std::string enumIdentifier;
 
@@ -591,73 +629,6 @@ bool Parser::IsVariableDeclaration(Symbol &symbol, bool isGlobal)
             ReportError("Expected identifier after 'variable' keyword");
         }
     }
-    else
-    {
-        if (isGlobal)
-        {
-            ReportError("Expected 'variable' keyword after global identifier");
-        }
-        else
-        {
-            return false;
-        }
-
-    }
-    /*
-    else // i think this could be made else if(T_VARIABLE)
-    {
-        if (ValidateToken(T_VARIABLE))
-        {
-            if (ValidateToken(T_IDENTIFIER))
-            {
-                id = token->str;
-                if (ValidateToken(T_COLON))
-                {
-                    if (TypeCheck(type))
-                    {
-                        if (ValidateToken(T_LBRACKET))
-                        {
-                            if (ValidateToken(T_INTEGER) || ValidateToken(T_INT_LITERAL)) // I would assume anything that EVALUATES to an int could go here?
-                            {
-                                size = token->val.intValue;
-                                if (!ValidateToken(T_RBRACKET))
-                                {
-                                    ReportError("Expected ']' at end of array declaration");
-                                }
-                            }
-                        }
-                        else
-                        {
-                            size = 0;
-                        }
-                        symbol.id = id;
-                        symbol.type = type;
-                        symbol.declarationType = T_VARIABLE;
-                        symbol.size = size;
-                        symbol.isGlobal = isGlobal;
-                        symbol.parameters = std::vector<Symbol>(); // Variables should not have parameters
-                        return true;
-                    }
-                    else
-                    {
-                        ReportError("TYPE expected after ':'");
-                    }
-                }
-                else
-                {
-                    ReportError("Expected ':' after identifier");
-                }
-            }
-            else
-            {
-                ReportError("Expected identifier after 'variable' keyword");
-            }
-        }
-        else // Not a variable
-        {
-            return false;
-        }
-    }*/
 
     return false;
 }
@@ -1031,6 +1002,21 @@ bool Parser::TypeCheck(int &type)
     {
         type = token->type;
         return true;
+    }
+    else if (ValidateToken(T_IDENTIFIER)) // type is user defined (possibly)
+    {
+        std::string id = token->str;
+        Symbol sym;
+        bool isGlobal;
+        bool isFound;
+
+        isFound = symbolTable->DoesSymbolExist(id, sym, isGlobal);
+
+        if (isFound)
+        {
+            type = sym.type; // TODO: not sure about this
+            return true;
+        }
     }
 
     return false;

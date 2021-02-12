@@ -64,7 +64,6 @@
 #define T_STRING         297     // "STRING"
 #define T_BOOL           298     // "BOOL"
 #define T_ENUM           299     // "ENUM"
-#define T_ENUM_DEC       307     // enum declaration
 
 
 // Miscellaneous
@@ -76,6 +75,7 @@
 #define T_UNKNOWN        304      // unknown identifier/invalid characters
 #define T_EOF            305      // end of file
 #define T_COMMENT        306      // comment
+#define T_ENUM_DEC       307     // enum declaration
 
 
 // Token Structure

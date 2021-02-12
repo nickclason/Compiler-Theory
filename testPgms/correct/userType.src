@@ -1,10 +1,10 @@
 program test_program is
     global variable types : enum{type1, type2, type3};
-    global type myType is integer;
+    type myType is integer;
 
-    global variable x : myType;
+    variable x : myType;
     global variable y : myType;
-    global variable z : myType;
+    variable z : myType;
 begin
     x := 2;
     y := 2;
