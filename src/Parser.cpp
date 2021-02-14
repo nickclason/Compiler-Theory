@@ -51,6 +51,7 @@ void Parser::Program()
 {
     // New Scope for program
     symbolTable->AddScope();
+    AddIOFunctions(); // TODO: add for code gen
 
     if (!ProgramHeader())
     {
@@ -1540,3 +1541,101 @@ bool Parser::IsEnum()
 
     return false;
 }
+
+void Parser::AddIOFunctions()
+{
+
+//    int type;               // int, float, bool, enum, string
+//    int declarationType;    // variable declaration, procedure declaration, or user type declaration
+//    int size;               // size of arrays, 0 non-arrays
+//    bool isGlobal;          // True if this symbol is in the global scope; false otherwise
+//
+//    std::string id;
+//    std::vector<Symbol> parameters; // For procedures
+
+    int type = T_BOOL;
+    int decType = T_PROCEDURE;
+    int size = 0;
+    bool isGlobal = true;
+    std::string id = "GETBOOL";
+    std::vector<Symbol> params;
+    params.clear();
+
+    Symbol *s = new Symbol(type, decType, size, isGlobal, id, params);
+    symbolTable->AddSymbol(id, *s, isGlobal);
+
+    type = T_INTEGER;
+    id = "GETINTEGER";
+    Symbol *s2 = new Symbol(type, decType, size, isGlobal, id, params);
+    symbolTable->AddSymbol(id, *s2, isGlobal);
+
+    type = T_FLOAT;
+    id = "GETFLOAT";
+    Symbol *s3 = new Symbol(type, decType, size, isGlobal, id, params);
+    symbolTable->AddSymbol(id, *s3, isGlobal);
+
+    type = T_STRING;
+    id = "GETSTRING";
+    Symbol *s4 = new Symbol(type, decType, size, isGlobal, id, params);
+    symbolTable->AddSymbol(id, *s4, isGlobal);
+
+    type = T_BOOL;
+    id = "PUTBOOL";
+    int pType = T_BOOL;
+    int pDecType = T_VARIABLE;
+    bool pIsGlobal = false;
+    std::string pId = "VALUE";
+    Symbol *p = new Symbol(pType, pDecType, size, pIsGlobal, pId, std::vector<Symbol>());
+    params.push_back(*p);
+    Symbol *s5 = new Symbol(type, decType, size, isGlobal, id, params);
+    symbolTable->AddSymbol(id, *s5, isGlobal);
+
+    type = T_BOOL;
+    id = "PUTINTEGER";
+    pType = T_INTEGER;
+    pDecType = T_VARIABLE;
+    pIsGlobal = false;
+    pId = "VALUE";
+    Symbol *p2 = new Symbol(pType, pDecType, size, pIsGlobal, pId, std::vector<Symbol>());
+    params.clear();
+    params.push_back(*p2);
+    Symbol *s6 = new Symbol(type, decType, size, isGlobal, id, params);
+    symbolTable->AddSymbol(id, *s6, isGlobal);
+
+    type = T_BOOL;
+    id = "PUTFLOAT";
+    pType = T_FLOAT;
+    pDecType = T_VARIABLE;
+    pIsGlobal = false;
+    pId = "VALUE";
+    Symbol *p3 = new Symbol(pType, pDecType, size, pIsGlobal, pId, std::vector<Symbol>());
+    params.clear();
+    params.push_back(*p3);
+    Symbol *s7 = new Symbol(type, decType, size, isGlobal, id, params);
+    symbolTable->AddSymbol(id, *s7, isGlobal);
+
+    type = T_BOOL;
+    id = "PUTSTRING";
+    pType = T_STRING;
+    pDecType = T_VARIABLE;
+    pIsGlobal = false;
+    pId = "VALUE";
+    Symbol *p4 = new Symbol(pType, pDecType, size, pIsGlobal, pId, std::vector<Symbol>());
+    params.clear();
+    params.push_back(*p4);
+    Symbol *s8 = new Symbol(type, decType, size, isGlobal, id, params);
+    symbolTable->AddSymbol(id, *s8, isGlobal);
+
+    type = T_FLOAT;
+    id = "SQRT";
+    pType = T_INTEGER;
+    pDecType = T_VARIABLE;
+    pIsGlobal = false;
+    pId = "VALUE";
+    Symbol *p5 = new Symbol(pType, pDecType, size, pIsGlobal, pId, std::vector<Symbol>());
+    params.clear();
+    params.push_back(*p5);
+    Symbol *s9 = new Symbol(type, decType, size, isGlobal, id, params);
+    symbolTable->AddSymbol(id, *s9, isGlobal);
+}
+

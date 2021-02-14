@@ -98,6 +98,9 @@ class Parser {
         bool IsEnum();
 
 
+        void AddIOFunctions();
+
+
 };
 
 
