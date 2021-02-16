@@ -58,14 +58,14 @@ void PeekTest(std::string fileName)
 
 int main()
 {
-    std::string fileName = GetFileName();
+//    std::string fileName = GetFileName();
+    std::string fileName = "/Users/nick/Documents/Compiler-Theory/testPgms/correct/recursiveFib.src";
     token_t* tokenPtr = new token_t();
     Scanner* scannerPtr = new Scanner();
     SymbolTable* symbolTablePtr = new SymbolTable();
 
     // Initialize Scanner and get first token
     scannerPtr->InitScanner(fileName);
-
     Parser* p = new Parser(tokenPtr, scannerPtr, symbolTablePtr);
 
     return 0;

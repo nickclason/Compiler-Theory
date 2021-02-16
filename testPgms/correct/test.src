@@ -1,12 +1,12 @@
-program test_program is
-    global variable types : enum{type1, type2, type3};
-    global type myType is integer;
+program test is
+    global variable z : integer;
+procedure testProc : integer()
+    variable x : integer;
+    begin
+        x := 1;
+        return x;
+end procedure;
 
-    global variable x : myType;
-    global variable y : myType;
-    global variable z : myType;
 begin
-    x := 2;
-    y := 2;
-    z := x + y;
+    z := testProc();
 end program.

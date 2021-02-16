@@ -30,10 +30,8 @@ class Parser {
         std::string line;
         std::queue<std::string> errors;
 
-        // TODO:
-        //      Add to error functions as needed
         void DisplayAllErrors();
-        void ReportError(std::string errorMsg); // TODO: make reference or const
+        void ReportError(std::string errorMsg);
         void ReportTokenError(std::string errorMsg);
         void ReportExpectedTypeError(std::string errorMsg);
         void ReportTypeCheckError(std::string errorMsg);

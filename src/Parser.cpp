@@ -8,8 +8,6 @@
 //      resync???????                   -
 //      Might need a larger error class -
 
-// TODO: Get/Put int, float, bool, string, etc. These are for the runtime env, but also I think technically could be
-//       defined in the global scope?
 
 
 Parser::Parser(token_t *tokenPtr, Scanner *scannerPtr, SymbolTable* symbolTablePtr)
@@ -27,7 +25,7 @@ Parser::Parser(token_t *tokenPtr, Scanner *scannerPtr, SymbolTable* symbolTableP
     // Display Errors
     char errorCh = (errorCount > 1 || errorCount == 0) ? 's' : '\0';
     char warningCh = (warningCount > 1 || warningCount == 0) ? 's' : '\0';
-    printf("\nParsing Completed with %d error%c and %d warning%c", errorCount, errorCh, warningCount, warningCh);
+    printf("\nParsing completed with %d error%c and %d warning%c", errorCount, errorCh, warningCount, warningCh);
     if (!errors.empty())
     {
         DisplayAllErrors();
@@ -55,33 +53,33 @@ void Parser::Program()
 
     if (!ProgramHeader())
     {
-        ReportError("Program header expected"); // TODO: Change msg
+        ReportError("A program header was expected, but not found");
     }
 
     if (!ProgramBody())
     {
-        ReportError("Program body expected"); // TODO: Change msg
+        ReportError("The program body was expected, but not found");
     }
 
     // TODO: Treat leaving of the period as a warning and not an error. May change later
     if (!ValidateToken(T_PERIOD))
     {
-        ReportWarning("Expected '.' at the end of program"); // TODO: Change msg
+        ReportWarning("Expected '.' after 'end program'");
     }
 
     if (ValidateToken(T_EOF))
     {
         symbolTable->ExitScope();
     }
-    else
+    else // If there is anything after the period, should we just ignore it? (i.e test.src)
     {
-        ReportError("Some tokens remain when end of program was expected"); // TODO: Change msg
+        ReportWarning("Some tokens still remain when end of the program was expected");
+        symbolTable->ExitScope();
     }
 }
 
 bool Parser::ProgramHeader()
 {
-    // TODO: Rewrite/Cleanup/Optimize
     if (ValidateToken(T_PROGRAM))
     {
         std::string id;
@@ -94,13 +92,13 @@ bool Parser::ProgramHeader()
             }
             else
             {
-                ReportError("Expected 'is' after program identifier"); // TODO: Change msg
+                ReportError("'is' keyword expected after program identifier");
                 return false;
             }
         }
         else
         {
-            ReportError("Expected identifier after 'program"); // TODO: Change msg
+            ReportError("Identifier expected after 'program");
             return false;
         }
     }
@@ -139,7 +137,7 @@ bool Parser::ProgramBody()
                 {
                     if (!ValidateToken(T_SEMICOLON))
                     {
-                        ReportError("Expected ';' after expression in program body"); // TODO: Change msg
+                        ReportError("Expected ';' after statement in program body");
                     }
                 }
 
@@ -152,13 +150,13 @@ bool Parser::ProgramBody()
                     }
                     else
                     {
-                        ReportError("Expected 'end program' to end program execution"); // TODO: Change msg
+                        ReportError("'end program' expected to stop program execution");
                     }
                 }
                 else
                 {
                     // TODO: ReportFatalError?
-                    ReportError("Could not find another valid statement or end of program"); // TODO: Change msg
+                    ReportError("Another valid statement or end of program could not be found");
                     return false;
                 }
             }
@@ -166,7 +164,7 @@ bool Parser::ProgramBody()
         else
         {
             // TODO: ReportFatalError?
-            ReportError("Could not find another valid declaration or start of program execution"); // TODO: Change msg
+            ReportError("Valid declaration or start of program execution could not be found");
             return false;
         }
     }
@@ -191,7 +189,7 @@ bool Parser::ValidateToken(int tokenType)
     }
     else if (tempToken->type == T_UNKNOWN)
     {
-        ReportError("Unknown Token Error: " + token->str); // TODO: Change msg
+        ReportError("Unknown token was found: " + token->str);
 //        return ValidateToken(tokenType);
         return false;
     }
@@ -225,10 +223,7 @@ void Parser::DisplayAllErrors()
 
 void Parser::ReportError(std::string errorMsg)
 {
-    // TODO:
-    //      Implement method
-    //      add more detailed info, line, line #, col #, etc.
-    errors.push("Error: " + errorMsg);
+    errors.push("Error: " + errorMsg + ". Line: " + std::to_string(token->line) + " Col: " + std::to_string(token->col));
     errorCount++;
     errorFlag = true;
 }
@@ -256,10 +251,7 @@ void Parser::ReportTypeCheckError(std::string errorMsg)
 
 void Parser::ReportWarning(std::string warningMsg)
 {
-    // TODO:
-    //      Implement method
-    //      add more detailed info, line, line #, col #, etc.
-    errors.push("Warning: " + warningMsg);
+    errors.push("Warning: " + warningMsg + ". Line: " + std::to_string(token->line) + " Col: " + std::to_string(token->col));
     warningCount++;
 }
 
@@ -287,7 +279,6 @@ bool Parser::IsDeclaration(bool &isProcedureDec)
         symbolTable->ExitScope();
         symbolTable->AddSymbol(symbol.id, symbol, isGlobal);
         isProcedureDec = true;
-
         return true;
     }
     else if (IsVariableDeclaration(symbol, isGlobal))
@@ -302,7 +293,7 @@ bool Parser::IsDeclaration(bool &isProcedureDec)
     }
     else if (isGlobal)
     {
-        ReportError("Bad Line. Expected a valid procedure, variable declaration, or type declaration after 'global' keyword"); // TODO: Change msg
+        ReportError("After 'global' keyword, a valid procedure, variable declaration, or type declaration was expected"); // TODO: LineError
         return false;
     }
 
@@ -359,7 +350,7 @@ bool Parser::IsProcedureDeclaration(Symbol &symbol, bool isGlobal)
         }
         else
         {
-            ReportError("Expected procedure body after procedure header"); // TODO: Change msg & make fatalerror
+            ReportError("Procedure body was expected after procedure header"); // TODO: fatalerror
         }
     }
 
@@ -388,7 +379,7 @@ bool Parser::IsProcedureHeader(Symbol &symbol, bool isGlobal)
                         IsParameterList(symbol);
                         if (!ValidateToken(T_RPAREN))
                         {
-                            ReportError("Expected ')' after parameter list"); // TODO: msg
+                            ReportError("')' was expected after parameter list");
                         }
 
                         // Any parameters that exist should have alredy been added by IsParameterList()
@@ -403,7 +394,7 @@ bool Parser::IsProcedureHeader(Symbol &symbol, bool isGlobal)
                     }
                     else
                     {
-                        ReportError("Expected '('"); // TODO: Change msg
+                        ReportError("Expected '('");
                         return true;
                     }
                 }
@@ -437,7 +428,7 @@ bool Parser::IsParameterList(Symbol &symbol)
         {
             if(!IsParameter(symbol))
             {
-                ReportError("Parameter expected after ',' in parameter list"); // todo msg
+                ReportError("After ',' another parameter was expected in parameter list");
             }
         }
     }
@@ -504,20 +495,20 @@ bool Parser::IsProcedureBody()
                     }
                     else
                     {
-                        ReportError("Expected 'end procedure' at end of procedure declaration"); // TODO: Change msg
+                        ReportError("'end procedure' was expected after end of procedure declaration");
                         return true; // TODO: Treat this as a warning?
                     }
                 }
                 else
                 {
-                    ReportError("Expected 'end procedure' at the end of procedure declaration");
+                    ReportError("'end procedure' was expected at the end of procedure declaration");
                     return false;
                 }
             }
         }
         else
         {
-            ReportError("Could not find valid declaration or 'begin' keyword in procedure body"); // TODO: Modify
+            ReportError("Could not find another valid declaration or the 'begin' keyword in the procedure body");
             return false;
         }
     }
@@ -527,8 +518,6 @@ bool Parser::IsVariableDeclaration(Symbol &symbol, bool isGlobal)
 {
     std::string id;
     int type, size;
-
-    // TODO: user type support
 
     if (ValidateToken(T_VARIABLE))
     {
@@ -541,7 +530,7 @@ bool Parser::IsVariableDeclaration(Symbol &symbol, bool isGlobal)
                 {
                     if (ValidateToken(T_LBRACKET))
                     {
-                        if (ValidateToken(T_INTEGER) || ValidateToken(T_INT_LITERAL)) // I would assume anything that EVALUATES to an int could go here (i.e. ffunction call)?
+                        if (ValidateToken(T_INTEGER) || ValidateToken(T_INT_LITERAL))
                         {
                             size = token->val.intValue;
                             if (!ValidateToken(T_RBRACKET))
@@ -756,27 +745,27 @@ bool Parser::IsLoopStatement()
 
     if (!ValidateToken(T_LPAREN))
     {
-        ReportError("Expected '(' before for loop statement"); // TODO: msg and fatalerror?
+        ReportError("'(' expected before for loop statement");
     }
 
     if (!IsAssignmentStatement(id))
     {
-        ReportError("Expected assignment statement after '('"); // TODO: msg
+        ReportError("An assignment statement was expected after '('");
     }
 
     if (!ValidateToken(T_SEMICOLON))
     {
-        ReportError("Expected ';' after assignment statement in for loop"); // TODO: msg
+        ReportError("';' expected after assignment statement in for loop");
     }
 
     if (!IsExpression(size, type))
     {
-        ReportError("Expression expected after assignment in for loop"); // TODO: msg
+        ReportError("An expression was expected after assignment in for loop");
     }
 
     if (!ValidateToken(T_RPAREN))
     {
-        ReportError("Expected ')' after expression in for loop"); // TODO: msg
+        ReportError("')' expected after expression in for loop");
     }
 
     // Loop Body
@@ -786,7 +775,7 @@ bool Parser::IsLoopStatement()
         {
             if (!ValidateToken(T_SEMICOLON))
             {
-                ReportError("Expected ';' after statement"); // TODO: msg
+                ReportError("Expected ';' after statement");
             }
         }
 
@@ -798,12 +787,12 @@ bool Parser::IsLoopStatement()
             }
             else
             {
-                ReportError("Missing 'for' in 'end for' loop closure"); //todo: msg
+                ReportError("'for' is missing in 'end for' loop closure");
             }
         }
         else
         {
-            ReportError("Expected 'end for' at end of for loop"); // todo: msg
+            ReportError("'end for' expected at end of for loop");
             return false;
         }
     }
@@ -845,7 +834,7 @@ bool Parser::IsAssignmentStatement(std::string &id)
         {
             if ((size != checkSize) && (size > 1) && (checkSize <= 1))
             {
-                ReportError("Invalid assignment, size of expression must match destination size"); // todo: msg
+                ReportError("Invalid assignment: size of expression must match destination size");
             }
 
             if (type != checkType)
@@ -869,9 +858,13 @@ bool Parser::IsAssignmentStatement(std::string &id)
                     // convert integers to floats
                     type = T_FLOAT;
                 }
+                else if (((type == T_STRING && checkType == T_STRING_LITERAL) || (checkType == T_STRING && type == T_STRING_LITERAL))) // support string comparisons
+                {
+                    type = T_STRING;
+                }
                 else
                 {
-                    ReportError("Type mismatch in expression"); // todo msg
+                    ReportError("Type mismatch in expression");
                 }
             }
         }
@@ -881,7 +874,7 @@ bool Parser::IsAssignmentStatement(std::string &id)
     else
     {
         ReportError("Expected ':=' after '" + id + "' in assignment statement");
-        return true; // TODO: Not sure about this
+        return true;
     }
 }
 
@@ -890,7 +883,6 @@ bool Parser::IsProcedureCall(std::string &id, int &size, int &type)
     std::vector<Symbol> parameterList;
     Symbol procedureCall;
     bool isGlobal;
-    bool isFound;
 
     // check that id != ""
     // check if symbol exists
@@ -924,7 +916,7 @@ bool Parser::IsProcedureCall(std::string &id, int &size, int &type)
     }
     else
     {
-        ReportError(id + " is not defined in the current scope"); // todo: msg
+        ReportError(id + " is not defined in the current scope");
     }
 
     size = procedureCall.size;
@@ -935,7 +927,7 @@ bool Parser::IsProcedureCall(std::string &id, int &size, int &type)
         IsArgumentList(parameterList, procedureCall);
         if (!ValidateToken(T_RPAREN))
         {
-            ReportError("Expected ')' following procedure arguments"); // TODO: msg
+            ReportError("')' was expected following procedure arguments");
         }
         else
         {
@@ -944,7 +936,7 @@ bool Parser::IsProcedureCall(std::string &id, int &size, int &type)
     }
     else
     {
-        ReportError("Expected '(' following procedure call"); // TODO: message
+        ReportError("'(' was expected following procedure call");
     }
 
     return false;
@@ -1115,7 +1107,7 @@ bool Parser::IsExpressionPrime(int &size, int &type)
         ValidateToken(T_NOT); // optional
         if (IsArithOp(opSize, opType))
         {
-            if ((type == T_INTEGER) && (opType != T_INTEGER)) // TODO: Messages
+            if ((type == T_INTEGER) && (opType != T_INTEGER))
             {
                 ReportError("Only integer arithmetic operators can be used with bitwise '|' and '&'");
             }
@@ -1139,7 +1131,7 @@ bool Parser::IsExpressionPrime(int &size, int &type)
         }
         else
         {
-            ReportError("Expected arithmetic op after '|' or '&' "); // todo: improve message
+            ReportError("Expected arithmetic op after '|' or '&' ");
         }
 
         IsExpression(size, type);
@@ -1168,7 +1160,6 @@ bool Parser::IsArithOpPrime(int &size, int &type)
 
     std::string op = token->str; // for code gen
 
-    // TODO: fix this up
     if (ValidateToken(T_ADD));
     else if (ValidateToken(T_SUBTRACT));
     else return false;
@@ -1215,16 +1206,26 @@ bool Parser::IsRelation(int &size, int &type)
 
 bool Parser::IsRelationPrime(int &size, int &type)
 {
-    int termSize, termType;
+    int termSize, termType, opType;
     std::string op = token->str; // for code gen
 
     if (ValidateToken(T_LESSTHAN) || ValidateToken(T_GREATERTHAN) || ValidateToken(T_LTEQ) || ValidateToken(T_GTEQ) || ValidateToken(T_EQEQ))
     {
+        op = token->str;
+        opType = token->type;
         if (IsTerm(termSize, termType))
         {
-            if (((type != T_BOOL) && (type != T_INTEGER)) || ((termType != T_BOOL) && (termType != T_INTEGER)))
+            if (((type == T_STRING || type == T_STRING_LITERAL) && (termType == T_STRING || termType == T_STRING_LITERAL)))
             {
-                ReportError("Relational ops are only valid for types of bool or integers('0' or '1')"); // TODO: msg
+                // '==' is the only support relational operator for strings
+                if (opType != T_EQEQ)
+                {
+                    ReportError("Relational operator '" + op + "' is not supported for the string type");
+                }
+            }
+            else if (((type != T_BOOL) && (type != T_INTEGER)) || ((termType != T_BOOL) && (termType != T_INTEGER)))
+            {
+                ReportError("Relational ops are only valid for types of bool or integers('0' or '1')");
             }
 
             if ((size != termSize) && (size != 0) && (termSize != 0))
@@ -1238,7 +1239,7 @@ bool Parser::IsRelationPrime(int &size, int &type)
         }
         else
         {
-            ReportError("Expected term after relational operator"); // todo: msg
+            ReportError("Term expected after relational operator");
         }
 
         IsRelation(size, type);
@@ -1274,7 +1275,7 @@ bool Parser::IsTermPrime(int &size, int &type)
     {
         if (!IsNumber(type) || !IsNumber(factorType))
         {
-            ReportError("Only integer and float values are allowed for arithmetic ops in terms"); // TODO: Msg
+            ReportError("Integer and float values are the only allowed types for arithmetic ops in terms");
         }
 
         if ((size != factorSize) && ((size !=0 ) && (factorSize != 0)))
@@ -1288,7 +1289,7 @@ bool Parser::IsTermPrime(int &size, int &type)
     }
     else
     {
-        ReportError("Expected factor after arithmetic operator"); // TODO: Msg
+        ReportError("Factor expected after arithmetic operator");
     }
 
     IsTermPrime(size, type);
@@ -1313,12 +1314,12 @@ bool Parser::IsFactor(int &size, int &type)
             }
             else
             {
-                ReportError("Expected ')' around expression"); // TODO msg and fatal error
+                ReportError("Expected ')' around expression");
             }
         }
         else
         {
-            ReportError("Expected expression in parenthesis"); // TODO: msg / fatal error
+            ReportError("Expected expression in parenthesis");
         }
     }
     else if (IsProcedureCall(id, tempSize, tempType))
@@ -1348,7 +1349,7 @@ bool Parser::IsFactor(int &size, int &type)
 
             if (!IsNumber(type))
             {
-                ReportError("'-' only valid before integer and floats"); // TODO: msg
+                ReportError("'-' is only valid before integer and floats");
             }
 
             return true;
@@ -1383,7 +1384,8 @@ bool Parser::IsFactor(int &size, int &type)
     else if (IsString())
     {
         size = 0;
-        type = T_STRING;
+//        type = T_STRING;
+        type = token->type;
         return true;
     }
     else if (IsEnum())
@@ -1419,7 +1421,7 @@ bool Parser::IsName(int &size, int &type)
         {
             if (symbol.declarationType == T_PROCEDURE)
             {
-                ReportError(id + " is not a variable in this scope"); // todo: msg
+                ReportError(id + " is not declared as a variable in this scope");
             }
             else
             {
@@ -1429,7 +1431,7 @@ bool Parser::IsName(int &size, int &type)
         }
         else
         {
-            ReportError(id + " is not declared in this scope"); // todo: msg
+            ReportError(id + " is not declared in this scope");
             size = 0;
             type = T_UNKNOWN;
         }
@@ -1438,7 +1440,7 @@ bool Parser::IsName(int &size, int &type)
         {
             if (symbol.size == 0 && symbol.declarationType != T_PROCEDURE)
             {
-                ReportError(id + " is not an array"); // todo: msg
+                ReportError(id + " is not an array");
             }
 
             int arrSize, arrType;
@@ -1462,7 +1464,7 @@ bool Parser::IsName(int &size, int &type)
             }
             else
             {
-                ReportError("Expected expression between brackets"); // todo: msg
+                ReportError("An expression was expected between '[ ]'");
             }
 
         }
@@ -1513,7 +1515,6 @@ bool Parser::IsString()
 
 bool Parser::IsBool()
 {
-    // TODO: Might need to fix these
     std::string str = token->str;
 
     if (ValidateToken(T_TRUE))
@@ -1531,7 +1532,6 @@ bool Parser::IsBool()
 
 bool Parser::IsEnum()
 {
-    // TODO: might need to fix these
     std::string str = token->str;
 
     if (ValidateToken(T_ENUM))
