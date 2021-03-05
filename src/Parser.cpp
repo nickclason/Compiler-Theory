@@ -1105,9 +1105,12 @@ bool Parser::IsArithOpPrime(int &size, int &type)
 
     if (IsRelation(relSize, relType))
     {
-        if (!IsNumber(relType) || !IsNumber(type))
-        {
-            ReportError("Value must be integer or float for arithmetic operations");
+        if (!IsNumber(relType) || !IsNumber(type)) {
+            if (type == T_INTEGER && relType == T_BOOL || (type == T_BOOL && relType == T_INTEGER)); // TODO: automatic conversion between ints/bool and vice versa
+            else
+            {
+                ReportError("Value must be integer or float for arithmetic operations");
+            }
         }
 
         if ((size != relSize) && (size != 0) && (relSize != 0))

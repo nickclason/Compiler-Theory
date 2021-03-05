@@ -1,12 +1,8 @@
 program test is
-    global variable z : integer;
-procedure testProc : integer()
-    variable x : integer;
-    begin
-        x := 1;
-        return x;
-end procedure;
-
+    global variable x : integer;
+    global variable y : integer;
+    global variable isTrue : bool;
 begin
-    z := testProc();
+    x := 2;
+    isTrue :=  1 + 4 > x + 1;
 end program.
