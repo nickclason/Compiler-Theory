@@ -286,55 +286,10 @@ bool Parser::IsDeclaration(bool &isProcedureDec)
         symbolTable->AddSymbol(symbol.id, symbol, isGlobal);
         return true;
     }
-    else if (IsTypeDelaration(symbol, isGlobal))
-    {
-        symbolTable->AddSymbol(symbol.id, symbol, isGlobal);
-        return true;
-    }
     else if (isGlobal)
     {
         ReportError("After 'global' keyword, a valid procedure, variable declaration, or type declaration was expected"); // TODO: LineError
         return false;
-    }
-
-    return false;
-}
-
-bool Parser::IsTypeDelaration(Symbol &symbol, bool isGlobal)
-{
-    int typeType;
-    std::string typeID;
-
-    if (ValidateToken(T_TYPE))
-    {
-        if (IsIdentifier(typeID))
-        {
-            if (ValidateToken(T_IS))
-            {
-                if (TypeCheck(typeType))
-                {
-                    symbol.id = typeID;
-                    symbol.type = typeType;
-                    symbol.declarationType = T_TYPE;
-                    symbol.size = 0;
-                    symbol.isGlobal = isGlobal;
-                    symbol.parameters = std::vector<Symbol>();
-                    return true;
-                }
-                else
-                {
-                    ReportError("Expected a type after 'is' keyword in type declaration");
-                }
-            }
-            else
-            {
-                ReportError("Expected 'is' after identifier in type declaration");
-            }
-        }
-        else
-        {
-            ReportError("Expected identifier after 'TYPE' keyword");
-        }
     }
 
     return false;
@@ -371,7 +326,7 @@ bool Parser::IsProcedureHeader(Symbol &symbol, bool isGlobal)
             symbolTable->ChangeScopeName(id);
             if (ValidateToken(T_COLON))
             {
-                if (TypeCheck(type))
+                if (IsTypeMark(type))
                 {
                     if (ValidateToken(T_LPAREN))
                     {
@@ -526,7 +481,7 @@ bool Parser::IsVariableDeclaration(Symbol &symbol, bool isGlobal)
             id = token->str;
             if (ValidateToken(T_COLON))
             {
-                if (TypeCheck(type))
+                if (IsTypeMark(type))
                 {
                     if (ValidateToken(T_LBRACKET))
                     {
@@ -985,31 +940,15 @@ bool Parser::IsArgumentList(std::vector<Symbol> &parameterList, Symbol &procedur
     return true;
 }
 
-bool Parser::TypeCheck(int &type)
+bool Parser::IsTypeMark(int &type)
 {
     if (ValidateToken(T_INTEGER) ||
         ValidateToken(T_FLOAT) ||
         ValidateToken(T_BOOL) ||
-        ValidateToken(T_STRING) ||
-        ValidateToken(T_ENUM))
+        ValidateToken(T_STRING))
     {
         type = token->type;
         return true;
-    }
-    else if (ValidateToken(T_IDENTIFIER)) // type is user defined (possibly)
-    {
-        std::string id = token->str;
-        Symbol sym;
-        bool isGlobal;
-        bool isFound;
-
-        isFound = symbolTable->DoesSymbolExist(id, sym, isGlobal);
-
-        if (isFound)
-        {
-            type = sym.type; // TODO: not sure about this
-            return true;
-        }
     }
 
     return false;

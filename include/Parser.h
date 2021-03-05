@@ -44,7 +44,7 @@ class Parser {
 
 
         bool ValidateToken(int tokenType);
-        bool TypeCheck(int &type);
+        bool IsTypeMark(int &type);
         bool IsValidAssignment(std::string &id, bool &isFound, bool &isGlobal, Symbol &symbol, int &checkSize, int &checkType);
 
 
@@ -53,7 +53,6 @@ class Parser {
 
         bool IsDeclaration(bool &isProcedureDec);
         bool IsVariableDeclaration(Symbol &symbol, bool isGlobal);
-        bool IsTypeDelaration(Symbol &symbol, bool isGlobal);
         bool IsProcedureDeclaration(Symbol &symbol, bool isGlobal);
         bool IsProcedureHeader(Symbol &symbol, bool isGlobal);
         bool IsProcedureBody();
