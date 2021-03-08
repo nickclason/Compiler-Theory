@@ -12,6 +12,10 @@
 
 #include <queue>
 
+#include <llvm/IR/IRBuilder.h>
+#include <llvm/IR/LLVMContext.h>
+#include <llvm/IR/Module.h>
+
 class Parser {
     public:
         token_t* token;
@@ -23,6 +27,12 @@ class Parser {
         ~Parser();
 
     private:
+
+        // LLVM
+        llvm::Module *llvmModule;
+        llvm::LLVMContext llvmContext;
+        llvm::IRBuilder<> *llvmBuilder;
+        llvm::Function *llvmCurrProc;
 
         int errorCount;
         int warningCount;
@@ -95,7 +105,10 @@ class Parser {
         bool IsEnum();
 
 
+        // LLVM/Codegen
         void AddIOFunctions();
+
+        llvm::Type *GetLLVMType(Symbol s);
 
 
 };

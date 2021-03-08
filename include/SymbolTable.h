@@ -26,6 +26,7 @@ class SymbolTable {
         bool DoesSymbolExist(std::string id, Symbol &symbol, bool &isGlobal);
 
         void ChangeScopeName(std::string id);
+        std::map<std::string, Symbol> GetLocalScope();
 
     private:
         Scope* curr;

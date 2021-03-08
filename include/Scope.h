@@ -25,6 +25,9 @@ public:
     bool DoesSymbolExist(std::string id, bool isGlobal);
 
     Symbol GetSymbol(std::string id);
+
+    std::map<std::string, Symbol> GetLocalScope();
+
 private:
     std::map<std::string, Symbol> globalScope;
     std::map<std::string, Symbol> localScope;

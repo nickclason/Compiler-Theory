@@ -1,8 +1,7 @@
 program test is
     global variable x : integer;
-    global variable y : integer;
-    global variable isTrue : bool;
+    //global variable y : integer;
+    //variable z : integer;
 begin
     x := 2;
-    isTrue :=  1 + 4 > x + 1;
 end program.

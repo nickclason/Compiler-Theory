@@ -4,6 +4,9 @@
 
 #include "../include/Parser.h"
 
+#include <llvm/IR/Value.h>
+
+
 // TODO:
 //      resync???????                   -
 //      Might need a larger error class -
@@ -18,6 +21,12 @@ Parser::Parser(token_t *tokenPtr, Scanner *scannerPtr, SymbolTable* symbolTableP
     errorFlag = false;
     errorCount = 0;
     warningCount = 0;
+
+    // LLVM
+    llvmModule = nullptr;
+    llvmBuilder = nullptr;
+    llvmCurrProc = nullptr;
+
 
     // Parsing Starts Here
     Program();
@@ -37,6 +46,11 @@ Parser::Parser(token_t *tokenPtr, Scanner *scannerPtr, SymbolTable* symbolTableP
     }
 
 
+    // LLVM Debug (dump)
+    printf("\n\n");
+    llvmModule->print(llvm::errs(), nullptr);
+
+
 }
 
 Parser::~Parser() {
@@ -49,7 +63,7 @@ void Parser::Program()
 {
     // New Scope for program
     symbolTable->AddScope();
-    AddIOFunctions(); // TODO: add for code gen
+//    AddIOFunctions(); // TODO: add for code gen
 
     if (!ProgramHeader())
     {
@@ -86,6 +100,11 @@ bool Parser::ProgramHeader()
         if (IsIdentifier(id))
         {
             symbolTable->ChangeScopeName(id);
+
+            // LLVM
+            llvmModule = new llvm::Module(id, llvmContext);
+            llvmBuilder = new llvm::IRBuilder<>(llvmContext);
+
             if (ValidateToken(T_IS))
             {
                 return true;
@@ -133,6 +152,33 @@ bool Parser::ProgramBody()
         {
             while (true)
             {
+
+                // LLVM
+                std::vector<llvm::Type *> args;
+                llvm::FunctionType *functionType = llvm::FunctionType::get(llvmBuilder->getInt32Ty(), args, false);
+                llvm::FunctionCallee mainCallee = llvmModule->getOrInsertFunction("main", functionType);
+                llvm::Constant *main = llvm::dyn_cast<llvm::Constant>(mainCallee.getCallee());
+
+                llvmCurrProc = llvm::cast<llvm::Function>(main);
+                llvmCurrProc->setCallingConv(llvm::CallingConv::C);
+
+                llvm::BasicBlock *procEntry = llvm::BasicBlock::Create(llvmContext, "entrypoint", llvmCurrProc);
+                llvmBuilder->SetInsertPoint(procEntry);
+
+                // add variables to the local scope
+                for (auto &it : symbolTable->GetLocalScope())
+                {
+                    if (it.second.declarationType != T_VARIABLE || it.second.isGlobal) // I think the isGlobal check is needed, as to not redefine global vars in the main scope
+                    {
+                        continue;
+                    }
+
+                    llvm::Value *address = nullptr;
+                    // TODO: if array
+                    address = llvmBuilder->CreateAlloca(GetLLVMType(it.second));
+                    it.second.llvmAddress = address;
+                }
+
                 while (IsStatement())
                 {
                     if (!ValidateToken(T_SEMICOLON))
@@ -146,6 +192,14 @@ bool Parser::ProgramBody()
                 {
                     if (ValidateToken(T_PROGRAM))
                     {
+
+                        // LLVM
+                         if (llvmBuilder->GetInsertBlock()->getTerminator() == NULL)
+                         {
+                             llvm::Constant *retVal = llvm::ConstantInt::getIntegerValue(llvmBuilder->getInt32Ty(), llvm::APInt(32, 0, true));
+                             llvmBuilder->CreateRet(retVal);
+                         }
+
                         return true;
                     }
                     else
@@ -494,62 +548,10 @@ bool Parser::IsVariableDeclaration(Symbol &symbol, bool isGlobal)
                             }
                         }
                     }
-                    else if (type == T_ENUM)
-                    {
-                        symbol.id = id;
-                        symbol.type = T_ENUM;
-                        symbol.declarationType = T_ENUM_DEC;
-                        symbol.size = size;
-                        symbol.isGlobal = isGlobal;
-                        symbol.parameters = std::vector<Symbol>();
-
-                        if (ValidateToken(T_LBRACE))
-                        {
-
-                            // TODO: Need a way to assign values to the identifiers within the enum
-                            Symbol enumSym;
-                            std::string enumIdentifier;
-
-                            IsIdentifier(enumIdentifier);
-                            enumSym.id = enumIdentifier;
-                            enumSym.type = T_INTEGER;
-                            enumSym.declarationType = T_ENUM_DEC;
-                            enumSym.size = 0;
-                            enumSym.isGlobal = symbol.isGlobal;
-
-                            symbolTable->AddSymbol(enumIdentifier, enumSym, enumSym.isGlobal);
-
-                            while (ValidateToken(T_COMMA))
-                            {
-                                IsIdentifier(enumIdentifier);
-                                enumSym = Symbol();
-                                enumSym.id = enumIdentifier;
-                                enumSym.isGlobal = symbol.isGlobal;
-                                enumSym.type = T_INTEGER;
-                                enumSym.declarationType = T_ENUM_DEC;
-
-                                symbolTable->AddSymbol(enumIdentifier, enumSym, enumSym.isGlobal);
-                            }
-
-                            if (!ValidateToken(T_RBRACE))
-                            {
-                                ReportError("Expected }");
-//                                return false;
-                            }
-
-                            return true;
-                        }
-                        else
-                        {
-                            ReportError("Expected '{' after enum type declaration");
-//                            return false;
-                        }
-                    }
                     else
                     {
                         size = 0;
                     }
-
 
                     symbol.id = id;
                     symbol.type = type;
@@ -557,6 +559,20 @@ bool Parser::IsVariableDeclaration(Symbol &symbol, bool isGlobal)
                     symbol.size = size;
                     symbol.isGlobal = isGlobal;
                     symbol.parameters = std::vector<Symbol>(); // Variables should not have parameters
+
+                    if (symbol.isGlobal)
+                    {
+                        llvm::Type *globalType = nullptr;
+                        // TODO: if array
+                        globalType = GetLLVMType(symbol);
+
+                        llvm::Constant *constInit = llvm::Constant::getNullValue(globalType);
+                        llvm::Value *val = new llvm::GlobalVariable(*llvmModule, globalType, false,
+                                                                    llvm::GlobalValue::CommonLinkage, constInit, symbol.id);
+
+                        // TODO: if array
+                        symbol.llvmAddress = val;
+                    }
                     return true;
                 }
                 else
@@ -1579,5 +1595,24 @@ void Parser::AddIOFunctions()
     params.push_back(*p5);
     Symbol *s9 = new Symbol(type, decType, size, isGlobal, id, params);
     symbolTable->AddSymbol(id, *s9, isGlobal);
+}
+
+llvm::Type *Parser::GetLLVMType(Symbol s)
+{
+    int type = s.type;
+    switch (type)
+    {
+        case T_BOOL:
+            return llvmBuilder->getInt1Ty();
+        case T_INTEGER:
+            return llvmBuilder->getInt32Ty();
+        case T_FLOAT:
+            return llvmBuilder->getFloatTy();
+        case T_STRING:
+            return llvmBuilder->getInt8PtrTy();
+        default:
+            std::cout << "Unknown Type" << std::endl;
+            return llvm::IntegerType::getInt1Ty(llvmModule->getContext());
+    }
 }
 

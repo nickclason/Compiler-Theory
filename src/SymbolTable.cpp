@@ -112,4 +112,8 @@ void SymbolTable::ChangeScopeName(std::string id)
     curr->SetName(id);
 }
 
+std::map<std::string, Symbol> SymbolTable::GetLocalScope()
+{
+    return curr->GetLocalScope();
+}
 

@@ -10,8 +10,14 @@
 #include <string>
 #include <vector>
 
+#include <llvm/IR/Value.h>
+
 struct Symbol
 {
+    // LLVM
+    llvm::Value *llvmAddress;
+
+
     int type;               // int, float, bool, enum, string
     int declarationType;    // variable declaration, procedure declaration, or user type declaration
     int size;               // size of arrays, 0 non-arrays

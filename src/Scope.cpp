@@ -89,3 +89,8 @@ void Scope::PrintScope()
         std::cout << "\t{ID: " << symbol.first << ", Type: " << symbol.second.type << ", DeclType: " << symbol.second.declarationType << "}" << std::endl;
     }
 }
+
+std::map<std::string, Symbol> Scope::GetLocalScope()
+{
+    return this->localScope;
+}
