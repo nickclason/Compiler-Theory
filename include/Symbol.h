@@ -12,39 +12,78 @@
 
 #include <llvm/IR/Value.h>
 
-struct Symbol
+class Symbol
 {
-    // LLVM
-    llvm::Value *llvmAddress;
+public:
 
+    Symbol();
+    ~Symbol();
 
-    int type;               // int, float, bool, enum, string
-    int declarationType;    // variable declaration, procedure declaration, or user type declaration
-    int size;               // size of arrays, 0 non-arrays
-    bool isGlobal;          // True if this symbol is in the global scope; false otherwise
+    void PrintDebugInfo();
+
+    const std::string &GetId() const;
+    void SetId(const std::string &id);
+
+    int GetArraySize() const;
+    void SetArraySize(int arraySize);
+
+    int GetDeclarationType() const;
+    void SetDeclarationType(int declarationType);
+
+    int GetType() const;
+    void SetType(int type);
+
+    bool IsArray() const;
+    void SetIsArray(bool isArray);
+
+    bool IsGlobal() const;
+    void SetIsGlobal(bool isGlobal);
+
+    bool IsInitialized() const;
+    void SetIsInitialized(bool isInitialized);
+
+    bool IsValid() const;
+    void SetIsValid(bool isValid);
+
+    const std::vector<Symbol> &GetParameters() const;
+    void SetParameters(const std::vector<Symbol> &parameters);
+
+    llvm::Value *GetLLVMAddress() const;
+    void SetLLVMAddress(llvm::Value *llvmAddress);
+
+    llvm::Value *GetLLVMValue() const;
+    void SetLLVMValue(llvm::Value *llvmValue);
+
+    llvm::Value *GetLLVMArrayAddress() const;
+    void SetLLVMArrayAddress(llvm::Value *llvmArrayAddress);
+
+    llvm::Value *GetLLVMArrayBound() const;
+    void SetLLVMArrayBound(llvm::Value *llvmArrayBound);
+
+    llvm::Function *GetLLVMFunction() const;
+    void SetLLVMFunction(llvm::Function *llvmFunction);
+
+private:
 
     std::string id;
-    std::vector<Symbol> parameters; // For procedures
 
-    Symbol()
-    {
-        type = T_UNKNOWN;
-        declarationType = T_UNKNOWN;
-        size = -1;
-        isGlobal = false;
-        id = "";
-        parameters = std::vector<Symbol>();
-    }
+    int arraySize;
+    int declarationType;
+    int type;
 
-    Symbol(int &type_, int &decType_, int &size_, bool isGlobal_, std::string &id_, std::vector<Symbol> parameters_)
-    {
-        type = type_;
-        declarationType = decType_;
-        size = size_;
-        isGlobal = isGlobal_;
-        id = id_;
-        parameters = parameters_;
-    }
+    bool isArray;
+    bool isGlobal;
+    bool isInitialized;
+    bool isValid;
+
+    std::vector<Symbol> parameters;
+
+    // LLVM
+    llvm::Value *llvmAddress;
+    llvm::Value *llvmValue;
+    llvm::Value *llvmArrayAddress;
+    llvm::Value *llvmArrayBound;
+    llvm::Function *llvmFunction;
 };
 
 #endif //COMPILER_THEORY_SYMBOL_H

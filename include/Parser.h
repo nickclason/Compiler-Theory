@@ -10,109 +10,94 @@
 #include "../include/Symbol.h"
 #include "../include/SymbolTable.h"
 
-#include <queue>
-
 #include <llvm/IR/IRBuilder.h>
 #include <llvm/IR/LLVMContext.h>
 #include <llvm/IR/Module.h>
 
-class Parser {
-    public:
-        token_t* token;
-        Scanner* scanner;
-        SymbolTable* symbolTable;
+class Parser
+{
+public:
 
-        // Constructor & Destructor
-        Parser(token_t* tokenPtr, Scanner* scannerPtr, SymbolTable* symbolTablePtr);
-        ~Parser();
+    Parser(std::string fileName, bool debug_, Scanner scanner_, SymbolTable symbolTable_, token_t *token_);
+    ~Parser();
 
-    private:
+    void Program();
+    void InitLLVM();
 
-        // LLVM
-        llvm::Module *llvmModule;
-        llvm::LLVMContext llvmContext;
-        llvm::IRBuilder<> *llvmBuilder;
-        llvm::Function *llvmCurrProc;
+private:
+    Scanner scanner;
+    SymbolTable symbolTable;
+    token_t *token;
 
-        int errorCount;
-        int warningCount;
-        bool errorFlag;
-        std::string line;
-        std::queue<std::string> errors;
+    int procedureCount;
 
-        void DisplayAllErrors();
-        void ReportError(std::string errorMsg);
-        void ReportTokenError(std::string errorMsg);
-        void ReportExpectedTypeError(std::string errorMsg);
-        void ReportTypeCheckError(std::string errorMsg);
-        void ReportWarning(std::string warningMsg);
+    bool debug;
+    bool stopParse;
+    bool errorFlag;
+
+    llvm::Module *llvmModule;
+    llvm::IRBuilder<> *llvmBuilder;
+    llvm::LLVMContext llvmContext;
+    llvm::Function *llvmCurrProc;
 
 
-        void Program();
-        bool ProgramHeader();
-        bool ProgramBody();
+    // General/Utility Functions
+    bool ValidateToken(int tokenType);
+
+    void PrintDebugInfo(std::string langID);
+
+    void YieldError(token_t token);
+    void YieldError(std::string msg, token_t token);
+    void YieldMissingTokenError(std::string expected, token_t token);
+    void YieldTypeMismatchError(std::string expected, std::string actual, token_t token);
+    void YieldOpTypeCheckError(std::string op, std::string type1, std::string type2, token_t token);
+
+    void YieldWarning(std::string msg, token_t token);
+
+    void Resync(token_t tokens[], int length);
 
 
-        bool ValidateToken(int tokenType);
-        bool IsTypeMark(int &type);
-        bool IsValidAssignment(std::string &id, bool &isFound, bool &isGlobal, Symbol &symbol, int &checkSize, int &checkType);
+    // Parsing
+    void ProgramHeader();
+    void ProgramBody();
 
+    void Declaration();
+    void WhileDeclarations();
+    void ProcedureDeclaration(Symbol &procedure);
+    void ProcedureHeader(Symbol &procedure);
+    void ParameterList(Symbol &procedure);
+    void Parameter(Symbol &procedure);
+    void ProcedureBody(Symbol &procedure);
+    void VariableDeclaration(Symbol &variable);
+    void TypeMark(Symbol &symbol);
+    void Bound(Symbol &symbol);
+    void Statement();
+    void AssignmentStatement();
+    void IfStatement();
+    void LoopStatement();
+    void ReturnStatement();
 
-        bool IsIdentifier(std::string &id);
+    Symbol ProcedureCall();
+    Symbol Destination();
+    Symbol Expression(Symbol expectedType);
+    Symbol ExpressionTail(Symbol expectedType);
+    Symbol ArithOp(Symbol expectedType);
+    Symbol ArithOpTail(Symbol expectedType);
+    Symbol Relation(Symbol expectedType);
+    Symbol RelationTail(Symbol expectedType);
+    Symbol Term(Symbol expectedType);
+    Symbol TermTail(Symbol expectedType);
+    Symbol Factor(Symbol expectedType);
+    Symbol Name();
+    Symbol Number();
+    Symbol String();
 
+    std::string Identifier();
 
-        bool IsDeclaration(bool &isProcedureDec);
-        bool IsVariableDeclaration(Symbol &symbol, bool isGlobal);
-        bool IsProcedureDeclaration(Symbol &symbol, bool isGlobal);
-        bool IsProcedureHeader(Symbol &symbol, bool isGlobal);
-        bool IsProcedureBody();
-        bool IsParameter(Symbol &symbol);
-        bool IsParameterList(Symbol &symbol);
+    std::vector<llvm::Value *> ArgumentList(std::vector<Symbol>::iterator curr, std::vector<Symbol>::iterator end);
 
-
-        bool IsStatement();
-        bool IsIfStatement();
-        bool IsLoopStatement();
-        bool IsReturnStatement();
-        bool IsAssignmentStatement(std::string &id);
-
-
-        bool IsExpression(int &size, int &type);
-        bool IsExpressionPrime(int &size, int &type);
-
-        bool IsArithOp(int &size, int &type);
-        bool IsArithOpPrime(int &size, int &type);
-
-        bool IsRelation(int &size, int &type);
-        bool IsRelationPrime(int &size, int &type);
-
-        bool IsTerm(int &size, int &type);
-        bool IsTermPrime(int &size, int &type);
-
-        bool IsFactor(int &size, int &type);
-
-        bool IsProcedureCall(std::string &id, int &size, int &type);
-        bool IsArgumentList(std::vector<Symbol> &parameterList, Symbol &procedureCall);
-
-
-
-        bool IsNumber(int &type);
-        bool IsName(int &size, int &type);
-        bool IsInt();
-        bool IsFloat();
-        bool IsString();
-        bool IsBool();
-        bool IsEnum();
-
-
-        // LLVM/Codegen
-        void AddIOFunctions();
-
-        llvm::Type *GetLLVMType(Symbol s);
-
-
+    // LLVM
+    llvm::Type* GetLLVMType(Symbol symbol);
 };
-
-
 
 #endif //COMPILER_THEORY_PARSER_H

@@ -60,13 +60,14 @@ int main()
 {
 //    std::string fileName = GetFileName();
     std::string fileName = "/Users/nick/Documents/Compiler-Theory/testPgms/correct/test.src";
-    token_t* tokenPtr = new token_t();
-    Scanner* scannerPtr = new Scanner();
-    SymbolTable* symbolTablePtr = new SymbolTable();
+    Scanner scanner;
+    SymbolTable symbolTable;
 
     // Initialize Scanner and get first token
-    scannerPtr->InitScanner(fileName);
-    Parser* p = new Parser(tokenPtr, scannerPtr, symbolTablePtr);
+    scanner.InitScanner(fileName);
+    token_t *token = new token_t();
+
+    Parser *p = new Parser(fileName, true, scanner, symbolTable, token);
 
     return 0;
 }

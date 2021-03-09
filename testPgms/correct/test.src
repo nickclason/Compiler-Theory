@@ -1,7 +1,7 @@
 program test is
     global variable x : integer;
-    //global variable y : integer;
-    //variable z : integer;
+    variable y : integer;
+    global variable z : integer;
 begin
     x := 2;
 end program.

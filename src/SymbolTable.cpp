@@ -5,115 +5,105 @@
 #include "../include/definitions.h"
 #include "../include/SymbolTable.h"
 
-SymbolTable::SymbolTable()
-{
-    curr = nullptr;
-    prev = nullptr;
-    top = nullptr;
+
+SymbolTable::SymbolTable() {
+
 }
 
-SymbolTable::~SymbolTable()
-{
+SymbolTable::~SymbolTable() {
+
 }
 
-void SymbolTable::AddScope()
-{
-    if (curr != nullptr)
+void SymbolTable::AddScope() {
+    localScopes.push_back(std::map<std::string, Symbol>());
+}
+
+void SymbolTable::RemoveScope() {
+    if (localScopes.size() > 0)
     {
-        Scope *temp = curr;
-        curr = new Scope();
-        curr->prevScope = temp;
+        localScopes.pop_back();
     }
     else
     {
-        // New Global Scope
-        curr = new Scope();
-        curr->prevScope = nullptr;
-        top = curr;
+        std::cout << "Error: No scope to remove" << std::endl;
     }
 }
 
-void SymbolTable::ExitScope()
-{
-    if (curr != nullptr)
+void SymbolTable::AddSymbol(Symbol &symbol) {
+    // Debug only
+    std::cout << "\tInserting symbol: ";
+    symbol.PrintDebugInfo();
+
+    if (symbol.IsGlobal())
     {
-        curr->PrintScope();
-        Scope* temp = curr;
-        curr = curr->prevScope;
-        delete temp;
+        globalScope[symbol.GetId()] = symbol;
+    }
+    else
+    {
+        localScopes.back()[symbol.GetId()] = symbol;
     }
 }
 
-bool SymbolTable::AddSymbol(std::string id, Symbol symbol, bool isGlobal)
-{
-    if (curr != nullptr)
-    {
-        if (!curr->DoesSymbolExist(id, false))
-        {
-            curr->AddSymbol(symbol);
-            return true;
-        }
-
-        return false;
-    }
-
-    return false;
+void SymbolTable::SetScopeProc(Symbol proc) {
+    localScopes.back()["_proc"] = proc;
 }
 
-bool SymbolTable::AddSymbolToPrevScope(std::string id, Symbol symbol, bool isGlobal)
-{
-    Scope* previousScope = curr->prevScope;
-    if (previousScope != nullptr) // Only if a higher scope exists
+Symbol SymbolTable::GetScopeProc() {
+    std::map<std::string, Symbol>::iterator it = localScopes.back().find("_proc");
+    if (it != localScopes.back().end())
     {
-        if (!previousScope->DoesSymbolExist(id, false))
-        {
-            previousScope->AddSymbol(symbol);
-            return true;
-        }
-
-        return false;
+        return it->second;
     }
-    return false;
+    else
+    {
+        Symbol symbol;
+        symbol.SetIsValid(false);
+        return symbol;
+    }
 }
 
-bool SymbolTable::DoesSymbolExist(std::string id, Symbol &symbol, bool &isGlobal)
-{
-    if (curr == nullptr)
+bool SymbolTable::DoesSymbolExist(std::string id) {
+    std::map<std::string, Symbol>::iterator it = localScopes.back().find(id);
+    if (it != localScopes.back().end())
     {
-        // No scope to search
-        return false;
-    }
-
-    bool isFound = curr->DoesSymbolExist(id, false);
-    if (isFound)
-    {
-        isGlobal = false;
-        symbol = curr->GetSymbol(id);
         return true;
     }
-    else
-    {
-        isFound = top->DoesSymbolExist(id, true);
-        if (isFound)
-        {
-            isGlobal = true;
-            symbol = top->GetSymbol(id);
-            return true;
-        }
 
-        return false;
+    it = globalScope.find(id);
+    if (it != globalScope.end())
+    {
+        return true;
+    }
+
+    if (id.compare("main") == 0)
+    {
+        return true;
     }
 
     return false;
 }
 
-void SymbolTable::ChangeScopeName(std::string id)
-{
-    curr->SetName(id);
+Symbol SymbolTable::FindSymbol(std::string id) {
+    std::map<std::string, Symbol>::iterator it = localScopes.back().find(id);
+    if (it != localScopes.back().end())
+    {
+        // Debug
+        std::cout << "Found the following symbol:" << std::endl;
+        it->second.PrintDebugInfo();
+
+        return it->second;
+    }
+
+    it = globalScope.find(id);
+    if (it != globalScope.end())
+    {
+        return it->second;
+    }
+    Symbol symbol;
+    symbol.SetIsValid(false);;
+    return symbol;
 }
 
-std::map<std::string, Symbol> SymbolTable::GetLocalScope()
-{
-    return curr->GetLocalScope();
+std::map<std::string, Symbol> SymbolTable::GetLocalScope() {
+    return localScopes.back();
 }
-

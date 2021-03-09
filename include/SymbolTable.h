@@ -5,7 +5,6 @@
 #ifndef COMPILER_THEORY_SYMBOLTABLE_H
 #define COMPILER_THEORY_SYMBOLTABLE_H
 
-#include "Scope.h"
 #include "Symbol.h"
 
 #include <map>
@@ -14,24 +13,28 @@
 
 class SymbolTable {
 
-    public:
-        SymbolTable();
-        ~SymbolTable();
+public:
 
-        void AddScope();
-        void ExitScope();
+    SymbolTable();
+    ~SymbolTable();
 
-        bool AddSymbol(std::string id, Symbol symbol, bool isGlobal);
-        bool AddSymbolToPrevScope(std::string id, Symbol symbol, bool isGlobal);
-        bool DoesSymbolExist(std::string id, Symbol &symbol, bool &isGlobal);
+    void AddScope();
+    void RemoveScope();
 
-        void ChangeScopeName(std::string id);
-        std::map<std::string, Symbol> GetLocalScope();
+    void AddSymbol(Symbol &symbol);
 
-    private:
-        Scope* curr;
-        Scope* prev;
-        Scope* top;
+    void SetScopeProc(Symbol proc);
+    Symbol GetScopeProc();
+
+    bool DoesSymbolExist(std::string id);
+
+    Symbol FindSymbol(std::string id);
+
+    std::map<std::string, Symbol> GetLocalScope();
+
+private:
+    std::map<std::string, Symbol> globalScope;
+    std::vector<std::map<std::string, Symbol> > localScopes;
 };
 
 #endif //COMPILER_THEORY_SYMBOLTABLE_H

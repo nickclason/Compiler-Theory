@@ -363,7 +363,7 @@ Date             Description
 */
 token_t* Scanner::GetToken()
 {
-    token_t* newToken = new token_t();
+    token_t *newToken = new token_t();
 
     newToken->type = ScanOneToken(filePtr, newToken);
     newToken->line = lineCount;
@@ -517,7 +517,7 @@ void Scanner::UndoScan(char c)
 
 token_t* Scanner::PeekToken()
 {
-    token_t* newToken = new token_t();
+    token_t *newToken = new token_t();
 
     // get starting position of the FILE*
     fpos_t pos;
