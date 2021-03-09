@@ -56,8 +56,8 @@ void PeekTest(std::string fileName)
 
 int main()
 {
-//    std::string fileName = GetFileName();
-    std::string fileName = "/Users/nick/Documents/Compiler-Theory/testPgms/correct/test.src";
+    std::string fileName_ = GetFileName();
+    std::string fileName = "/Users/nick/Documents/Compiler-Theory/testPgms/correct/" + fileName_;
     Scanner scanner;
     SymbolTable symbolTable;
 

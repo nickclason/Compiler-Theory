@@ -63,6 +63,7 @@ private:
 
     void Declaration();
     void WhileDeclarations();
+    void WhileStatements(int terminators[], int terminatorsSize);
     void ProcedureDeclaration(Symbol &procedure);
     void ProcedureHeader(Symbol &procedure);
     void ParameterList(Symbol &procedure);
@@ -77,18 +78,26 @@ private:
     void LoopStatement();
     void ReturnStatement();
 
-    Symbol ProcedureCall();
+    Symbol ProcedureCall(bool &isProcCall);
     Symbol Destination();
+
     Symbol Expression(Symbol expectedType);
     Symbol ExpressionTail(Symbol expectedType);
+    Symbol ExpressionTypeCheck(Symbol expectedType, Symbol arithOp, Symbol exprTail, token_t *op, bool isNotOp);
+
     Symbol ArithOp(Symbol expectedType);
     Symbol ArithOpTail(Symbol expectedType);
+    Symbol ArithOpTypeCheck(Symbol expectedType, Symbol rel, Symbol tail, token_t *op);
+
     Symbol Relation(Symbol expectedType);
     Symbol RelationTail(Symbol expectedType);
+    Symbol RelationTypeCheck(Symbol expectedType, Symbol term, Symbol relTail, token_t *op);
+
     Symbol Term(Symbol expectedType);
     Symbol TermTail(Symbol expectedType);
+
     Symbol Factor(Symbol expectedType);
-    Symbol Name();
+    Symbol Name(bool &isName);
     Symbol Number();
     Symbol String();
 

@@ -107,3 +107,7 @@ Symbol SymbolTable::FindSymbol(std::string id) {
 std::map<std::string, Symbol> SymbolTable::GetLocalScope() {
     return localScopes.back();
 }
+
+void SymbolTable::AddIOFunctions(llvm::Module *llvmModule, llvm::LLVMContext &llvmContext, llvm::IRBuilder<> *llvmBuilder)
+{
+}

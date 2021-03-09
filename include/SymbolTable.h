@@ -11,6 +11,8 @@
 #include <string>
 #include <vector>
 
+#include <llvm/IR/IRBuilder.h>
+
 class SymbolTable {
 
 public:
@@ -31,6 +33,8 @@ public:
     Symbol FindSymbol(std::string id);
 
     std::map<std::string, Symbol> GetLocalScope();
+
+    void AddIOFunctions(llvm::Module *llvmModule, llvm::LLVMContext &llvmContext, llvm::IRBuilder<> * llvmBuilder);
 
 private:
     std::map<std::string, Symbol> globalScope;

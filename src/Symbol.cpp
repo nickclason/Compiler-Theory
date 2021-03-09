@@ -95,7 +95,7 @@ void Symbol::SetIsValid(bool isValid) {
     Symbol::isValid = isValid;
 }
 
-const std::vector<Symbol> &Symbol::GetParameters() const {
+std::vector<Symbol> &Symbol::GetParameters() {
     return parameters;
 }
 

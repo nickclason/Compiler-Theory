@@ -3,5 +3,6 @@ program test is
     variable y : integer;
     global variable z : integer;
 begin
-    x := 2;
+    y := 2;
+    //putInteger(x);
 end program.

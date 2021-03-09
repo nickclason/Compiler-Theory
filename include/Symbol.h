@@ -45,7 +45,7 @@ public:
     bool IsValid() const;
     void SetIsValid(bool isValid);
 
-    const std::vector<Symbol> &GetParameters() const;
+    std::vector<Symbol> &GetParameters();
     void SetParameters(const std::vector<Symbol> &parameters);
 
     llvm::Value *GetLLVMAddress() const;
