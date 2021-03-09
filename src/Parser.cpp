@@ -6,9 +6,6 @@
 #include "../include/Scanner.h"
 
 
-
-
-
 Parser::Parser(std::string fileName, bool debug_, Scanner scanner_, SymbolTable symbolTable_, token_t *token_)
 {
     debug = debug_;

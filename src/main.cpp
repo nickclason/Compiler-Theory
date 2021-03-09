@@ -4,8 +4,6 @@
 
 #include "../include/definitions.h"
 #include "../include/Parser.h"
-#include "../include/Scanner.h"
-#include "../include/SymbolTable.h"
 
 #include <iostream>
 
