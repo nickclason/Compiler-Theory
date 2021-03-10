@@ -68,17 +68,19 @@ private:
     void ProcedureHeader(Symbol &procedure);
     void ParameterList(Symbol &procedure);
     void Parameter(Symbol &procedure);
-    void ProcedureBody(Symbol &procedure);
+    void ProcedureBody();
     void VariableDeclaration(Symbol &variable);
     void TypeMark(Symbol &symbol);
     void Bound(Symbol &symbol);
+
     void Statement();
     void AssignmentStatement();
+    Symbol AssignmentTypeCheck(Symbol dest, Symbol expr, token_t *token);
     void IfStatement();
     void LoopStatement();
     void ReturnStatement();
 
-    Symbol ProcedureCall(bool &isProcCall);
+    Symbol ProcedureCallOrName();
     Symbol Destination();
 
     Symbol Expression(Symbol expectedType);
@@ -97,7 +99,7 @@ private:
     Symbol TermTail(Symbol expectedType);
 
     Symbol Factor(Symbol expectedType);
-    Symbol Name(bool &isName);
+//    Symbol Name();
     Symbol Number();
     Symbol String();
 
@@ -107,6 +109,7 @@ private:
 
     // LLVM
     llvm::Type* GetLLVMType(Symbol symbol);
+    llvm::Value* ConvertIntToBool(llvm::Value *intVal);
 };
 
 #endif //COMPILER_THEORY_PARSER_H

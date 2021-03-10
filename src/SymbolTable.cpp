@@ -110,4 +110,28 @@ std::map<std::string, Symbol> SymbolTable::GetLocalScope() {
 
 void SymbolTable::AddIOFunctions(llvm::Module *llvmModule, llvm::LLVMContext &llvmContext, llvm::IRBuilder<> *llvmBuilder)
 {
+    // putInteger(integer value) : bool
+    Symbol put_integer;
+    put_integer.SetId("PUTINTEGER");
+    put_integer.SetType(T_BOOL);
+    Symbol put_integer_arg;
+    put_integer_arg.SetId("value");
+    put_integer_arg.SetType(T_INTEGER);
+    put_integer_arg.SetDeclarationType(T_VARIABLE);
+    put_integer.GetParameters().push_back(put_integer_arg);
+    put_integer.SetIsGlobal(true);
+    put_integer.SetDeclarationType(T_PROCEDURE);
+
+    llvm::FunctionType *function_type = llvm::FunctionType::get(
+            llvmBuilder->getInt1Ty(),
+            {llvmBuilder->getInt32Ty()},
+            false);
+    llvm::Function *procedure = llvm::Function::Create(
+            function_type,
+            llvm::Function::ExternalLinkage,
+            put_integer.GetId(),
+            llvmModule);
+    put_integer.SetLLVMFunction(procedure);
+
+    AddSymbol(put_integer);
 }

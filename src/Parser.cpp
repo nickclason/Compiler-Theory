@@ -3,8 +3,27 @@
 //
 
 #include "../include/Parser.h"
-#include "../include/Scanner.h"
 
+#include "llvm/ADT/APFloat.h"
+#include "llvm/ADT/APInt.h"
+#include "llvm/IR/BasicBlock.h"
+#include "llvm/IR/CallingConv.h"
+#include "llvm/IR/Constant.h"
+#include "llvm/IR/Constants.h"
+#include "llvm/IR/DerivedTypes.h"
+#include "llvm/IR/GlobalValue.h"
+#include "llvm/IR/GlobalVariable.h"
+#include "llvm/IR/Instruction.h"
+#include "llvm/IR/IRPrintingPasses.h"
+#include "llvm/IR/LegacyPassManager.h"
+#include "llvm/IR/Verifier.h"
+#include "llvm/Support/FileSystem.h"
+#include "llvm/Support/Host.h"
+#include "llvm/Support/raw_ostream.h"
+#include "llvm/Support/TargetRegistry.h"
+#include "llvm/Support/TargetSelect.h"
+#include "llvm/Target/TargetMachine.h"
+#include "llvm/Target/TargetOptions.h"
 
 Parser::Parser(std::string fileName, bool debug_, Scanner scanner_, SymbolTable symbolTable_, token_t *token_)
 {
@@ -27,6 +46,8 @@ Parser::Parser(std::string fileName, bool debug_, Scanner scanner_, SymbolTable 
     if (debug)
     {
         llvmModule->print(llvm::errs(), nullptr);
+        auto target_triple = llvm::sys::getDefaultTargetTriple();
+
     }
 }
 
@@ -71,6 +92,7 @@ void Parser::ProgramHeader()
     llvmBuilder = new llvm::IRBuilder<>(llvmContext);
 
     // TODO: insert runtime functions
+    symbolTable.AddIOFunctions(llvmModule, llvmContext, llvmBuilder);
 
     if (!ValidateToken(T_IS))
     {
@@ -127,7 +149,25 @@ void Parser::ProgramBody()
     int terminatorsSize = 1;
     WhileStatements(terminators, terminatorsSize);
 
+    if (!ValidateToken(T_END))
+    {
+        YieldMissingTokenError("END", *token);
+        return;
+    }
 
+    if (!ValidateToken(T_PROGRAM))
+    {
+        YieldMissingTokenError("PROGRAM", *token);
+        return;
+    }
+
+    if (llvmBuilder->GetInsertBlock()->getTerminator() == NULL)
+    {
+        llvm::Constant *retVal = llvm::ConstantInt::getIntegerValue(llvmBuilder->getInt32Ty(), llvm::APInt(32, 0, true));
+        llvmBuilder->CreateRet(retVal);
+    }
+
+    return;
 }
 
 bool Parser::ValidateToken(int tokenType)
@@ -267,31 +307,41 @@ void Parser::Declaration()
     PrintDebugInfo("<declaration>");
 
     Symbol symbol;
-
-    token = scanner.PeekToken();
-
-    // TODO: might need to rework this to make all variables defined in the outer scope global
-    //       *** could also just treat localScopes[0] as the global scope ***
-    if (token->type == T_GLOBAL)
+    if (ValidateToken(T_GLOBAL))
     {
-        ValidateToken(T_GLOBAL);
         symbol.SetIsGlobal(true);
-        token = scanner.PeekToken();
-    }
-
-    if (token->type == T_PROCEDURE)
-    {
-        //ProcedureDeclaration(symbol);
-    }
-    else if (token->type == T_VARIABLE)
-    {
-        VariableDeclaration(symbol);
+        if (ValidateToken(T_PROCEDURE))
+        {
+            ProcedureDeclaration(symbol);
+        }
+        else if (ValidateToken(T_VARIABLE))
+        {
+            VariableDeclaration(symbol);
+        }
+        else
+        {
+            YieldError("Error parsing declaration, expected a procedure or variable", *token);
+            return;
+        }
     }
     else
     {
-        YieldError("Error parsing declaration, expected a procedure or variable", *token);
-        return;
+        symbol.SetIsGlobal(false); // Just to be safe, should already be set to false
+        if (ValidateToken(T_PROCEDURE))
+        {
+            ProcedureDeclaration(symbol);
+        }
+        else if (ValidateToken(T_VARIABLE))
+        {
+            VariableDeclaration(symbol);
+        }
+        else
+        {
+            YieldError("Error parsing declaration, expected a procedure or variable", *token);
+            return;
+        }
     }
+
 }
 
 void Parser::VariableDeclaration(Symbol &variable)
@@ -299,12 +349,6 @@ void Parser::VariableDeclaration(Symbol &variable)
     PrintDebugInfo("<variable_declaration>");
 
     variable.SetDeclarationType(T_VARIABLE);
-
-    if (!ValidateToken(T_VARIABLE))
-    {
-        YieldMissingTokenError("VARIABLE", *token);
-        return;
-    }
 
     std::string id = Identifier();
     variable.SetId(id);
@@ -340,6 +384,178 @@ void Parser::VariableDeclaration(Symbol &variable)
     }
 
     symbolTable.AddSymbol(variable);
+}
+
+void Parser::ProcedureDeclaration(Symbol &procedure)
+{
+    PrintDebugInfo("<procedure_declaration>");
+
+    symbolTable.AddScope();
+    procedure.SetDeclarationType(T_PROCEDURE);
+    ProcedureHeader(procedure);
+
+    std::vector<llvm::Type *> parameters;
+    for (Symbol param : procedure.GetParameters())
+    {
+        if (param.IsArray())
+        {
+            parameters.push_back(GetLLVMType(param)->getPointerTo());
+        }
+        else
+        {
+            parameters.push_back(GetLLVMType(param));
+        }
+    }
+
+    llvm::FunctionType *functionType = llvm::FunctionType::get(GetLLVMType(procedure), parameters, false);
+    llvm::FunctionCallee procCallee = llvmModule->getOrInsertFunction("proc_" + std::to_string(procedureCount), functionType);
+    llvm::Constant *proc = llvm::dyn_cast<llvm::Constant>(procCallee.getCallee());
+    procedureCount++;
+    llvm::Function *func = llvm::cast<llvm::Function>(proc);
+    func->setCallingConv(llvm::CallingConv::C);
+    procedure.SetLLVMFunction(func);
+
+    if (symbolTable.DoesSymbolExist(procedure.GetId()))
+    {
+        YieldError("This identifier already exists", *token);
+        return;
+    }
+
+    symbolTable.AddSymbol(procedure);
+    symbolTable.SetScopeProc(procedure);
+
+    ProcedureBody();
+
+    symbolTable.RemoveScope();
+
+    if (symbolTable.DoesSymbolExist(procedure.GetId()))
+    {
+        YieldError("This identifier already exists", *token);
+        return;
+    }
+
+    symbolTable.AddSymbol(procedure);
+}
+
+void Parser::ProcedureHeader(Symbol &procedure)
+{
+    PrintDebugInfo("<procedure_header>");
+
+    std::string id = Identifier(); // Get procedure name
+    procedure.SetId(id);
+
+    if (!ValidateToken(T_COLON))
+    {
+        YieldMissingTokenError(":", *token);
+        return;
+    }
+
+    TypeMark(procedure); // Get return type
+
+    if (!ValidateToken(T_LPAREN))
+    {
+        YieldMissingTokenError("(", *token);
+        return;
+    }
+
+    ParameterList(procedure); // Get parameters (if there are any)
+
+    if (!ValidateToken(T_RPAREN))
+    {
+        YieldMissingTokenError(")", *token);
+        return;
+    }
+}
+
+void Parser::ParameterList(Symbol &procedure)
+{
+    if (!ValidateToken(T_VARIABLE))
+    {
+        return; // No parameters
+    }
+
+    Parameter(procedure); // Get first parameter;
+
+    if (ValidateToken(T_COMMA)) // Expecting another parameter
+    {
+        ParameterList(procedure);
+    }
+}
+
+void Parser::Parameter(Symbol &procedure)
+{
+    Symbol param;
+    VariableDeclaration(param);
+    procedure.GetParameters().push_back(param);
+}
+
+void Parser::ProcedureBody() {
+    PrintDebugInfo("<procedure_body>");
+
+    WhileDeclarations();
+
+    Symbol procSymbol = symbolTable.GetScopeProc();
+    llvmCurrProc = procSymbol.GetLLVMFunction();
+
+    llvm::BasicBlock *procEntry = llvm::BasicBlock::Create(llvmContext, "entrypoint", llvmCurrProc);
+    llvmBuilder->SetInsertPoint(procEntry);
+
+    std::map<std::string, Symbol>::iterator it;
+    //for (it = symbolTable.GetLocalScope().begin(); it != symbolTable.GetLocalScope().end(); it++) {
+    // Not sure if this will work, might need pointer
+    for (auto &it : symbolTable.GetLocalScope())
+    {
+        if (it.second.GetDeclarationType() != T_VARIABLE) {
+            continue;
+        }
+
+        // TODO: array stuff
+
+        llvm::Value *address = nullptr;
+        address = llvmBuilder->CreateAlloca(GetLLVMType(it.second));
+        it.second.SetLLVMAddress(address);
+
+        symbolTable.AddSymbol(it.second);
+    }
+
+    llvm::Function::arg_iterator args = llvmCurrProc->arg_begin();
+    for (Symbol sym : procSymbol.GetParameters()) {
+        if (args == llvmCurrProc->arg_end()) {
+            YieldError("Could not generator LLVM IR for args", *token);
+            return;
+        }
+
+        llvm::Value *val = &*args++;
+
+        Symbol newSymbol = symbolTable.FindSymbol(sym.GetId());
+        newSymbol.SetLLVMValue(val);
+        newSymbol.SetIsInitialized(true);
+        // TODO: array stuff
+        llvmBuilder->CreateStore(val, newSymbol.GetLLVMAddress());
+
+        symbolTable.AddSymbol(newSymbol);
+    }
+
+    if (!ValidateToken(T_BEGIN)) {
+        YieldMissingTokenError("BEGIN", *token);
+        return;
+    }
+
+    int terminators[] = {T_END};
+    int terminatorSize = 1;
+    WhileStatements(terminators, terminatorSize);
+
+    if (!ValidateToken(T_PROCEDURE))
+    {
+        YieldMissingTokenError("PROCEDURE", *token);
+        return;
+    }
+
+    if (llvmBuilder->GetInsertBlock()->getTerminator() == NULL)
+    {
+        llvm::Constant *retVal = llvm::ConstantInt::getIntegerValue(llvmBuilder->getInt32Ty(), llvm::APInt(32, 0, true));
+        llvmBuilder->CreateRet(retVal);
+    }
 }
 
 void Parser::TypeMark(Symbol &symbol)
@@ -413,6 +629,7 @@ void Parser::WhileStatements(int terminators[], int terminatorsSize)
             if (token->type == terminators[i])
             {
                 continue_ = false;
+                token = scanner.GetToken(); // TODO: might have to change some stuff now
                 break;
             }
         }
@@ -462,7 +679,7 @@ void Parser::AssignmentStatement()
 
     Symbol expr = Expression(dest);
 
-    // TODO: type checking/type conversions
+    expr = AssignmentTypeCheck(dest, expr, token);
 
     if (!expr.IsValid())
     {
@@ -471,10 +688,65 @@ void Parser::AssignmentStatement()
 
     llvmBuilder->CreateStore(expr.GetLLVMValue(), dest.GetLLVMAddress());
     dest.SetLLVMValue(expr.GetLLVMValue());
-    symbolTable.AddSymbol(dest); // Update symbol
+    //symbolTable.AddSymbol(dest); // Update symbol
 
     dest.SetIsInitialized(true);
-    symbolTable.AddSymbol(dest); // Update TODO: remove this or the one above
+    symbolTable.AddSymbol(dest); // Update
+}
+
+Symbol Parser::AssignmentTypeCheck(Symbol dest, Symbol expr, token_t *token)
+{
+    if (dest.GetType() != expr.GetType())
+    {
+        bool isDiff = true;
+        if (dest.GetType() == T_BOOL && expr.GetType() == T_INTEGER)
+        {
+            isDiff = false;
+            expr.SetType(T_BOOL);
+            YieldWarning("Converting int to bool", *token);
+            llvm::Value *val = ConvertIntToBool(expr.GetLLVMValue());
+            expr.SetLLVMValue(val);
+        }
+
+        if (dest.GetType() == T_INTEGER)
+        {
+            if (expr.GetType() == T_BOOL)
+            {
+                expr.SetType(T_INTEGER);
+                isDiff = false;
+                YieldWarning("Converting bool to int", *token);
+                llvm::Value *val = llvmBuilder->CreateZExtOrTrunc(expr.GetLLVMValue(), llvmBuilder->getInt32Ty());
+                expr.SetLLVMValue(val);
+            }
+            else if (expr.GetType() == T_FLOAT)
+            {
+                expr.SetType(T_INTEGER);
+                isDiff = false;
+                YieldWarning("Converting float to int", *token);
+                llvm::Value *val = llvmBuilder->CreateFPToSI(expr.GetLLVMValue(), llvmBuilder->getInt32Ty());
+                expr.SetLLVMValue(val);
+            }
+        }
+
+        if (dest.GetType() == T_FLOAT && expr.GetType() == T_INTEGER)
+        {
+            isDiff = false;
+            YieldWarning("Converting int to float", *token);
+            expr.SetType(T_FLOAT);
+            llvm::Value *val = llvmBuilder->CreateSIToFP(expr.GetLLVMValue(), llvmBuilder->getFloatTy());
+            expr.SetLLVMValue(val);
+
+        }
+
+        if (isDiff)
+        {
+            YieldTypeMismatchError(std::to_string(dest.GetType()), std::to_string(expr.GetType()), *token);
+            expr.SetIsValid(false);
+            return expr;
+        }
+    }
+
+    return expr;
 }
 
 Symbol Parser::Destination()
@@ -1053,7 +1325,7 @@ Symbol Parser::Factor(Symbol expectedType)
     }
     else if (ValidateToken(T_IDENTIFIER))
     {
-        // Name or procedure call
+        sym = ProcedureCallOrName();
     }
     else if (ValidateToken(T_SUBTRACT))
     {
@@ -1085,6 +1357,99 @@ Symbol Parser::Factor(Symbol expectedType)
     return sym;
 }
 
+Symbol Parser::ProcedureCallOrName()
+{
+    PrintDebugInfo("<proc_call/name>");
+
+    Symbol sym = Symbol();
+    std::string id = token->val.stringValue;
+    sym = symbolTable.FindSymbol(id);
+
+    if (!sym.IsValid())
+    {
+        YieldError("Symbol not found: " + id, *token);
+        return sym;
+    }
+
+    if (ValidateToken(T_LPAREN))
+    {
+        // procedure
+        if (sym.GetDeclarationType() != T_PROCEDURE)
+        {
+            YieldError("Cannot call non procedure type", *token);
+            sym = Symbol();
+            sym.SetIsValid(false);
+
+            return sym;
+        }
+
+        Symbol procSym = sym;
+        sym = Symbol();
+        sym.SetType(procSym.GetType());
+
+        if (token->type == T_NOT || token->type == T_LPAREN ||
+            token->type == T_SUBTRACT || token->type == T_INT_LITERAL ||
+            token->type == T_FLOAT_LITERAL || token->type == T_IDENTIFIER ||
+            token->type == T_STRING_LITERAL || token->type == T_TRUE ||
+            token->type == T_FALSE)
+        {
+            std::vector<llvm::Value *> arguments = ArgumentList(procSym.GetParameters().begin(), procSym.GetParameters().end());
+            llvm::Value *val = llvmBuilder->CreateCall(procSym.GetLLVMFunction(), arguments);
+            sym.SetLLVMValue(val);
+        }
+        else
+        {
+            if (procSym.GetParameters().size() != 0)
+            {
+                YieldError("Missing arguments for procedure", *token);
+                sym.SetIsValid(false);
+
+                return sym;
+            }
+
+            llvm::Value *val = llvmBuilder->CreateCall(procSym.GetLLVMFunction());
+            sym.SetLLVMValue(val);
+        }
+
+        if (!ValidateToken(T_RPAREN))
+        {
+            YieldMissingTokenError(")", *token);
+            sym.SetIsValid(false);
+            return sym;
+        }
+    }
+    else
+    {
+        // name
+        if (sym.GetDeclarationType() != T_VARIABLE)
+        {
+            YieldError("Name must be a variable", *token);
+            sym.SetIsValid(false);
+
+            return sym;
+        }
+
+        // TODO: array stuff
+
+        if (sym.GetDeclarationType() == T_VARIABLE)
+        {
+            if (sym.IsInitialized() == false)
+            {
+                YieldError("Variable has not yet been initialized", *token);
+                sym.SetIsValid(false);
+
+                return sym;
+            }
+
+            // TODO: array
+            llvm::Value *val = llvmBuilder->CreateLoad(GetLLVMType(sym), sym.GetLLVMAddress());
+            sym.SetLLVMValue(val);
+        }
+    }
+
+    return sym;
+}
+
 Symbol Parser::Number()
 {
     PrintDebugInfo("<number>");
@@ -1107,6 +1472,59 @@ Symbol Parser::Number()
     return sym;
 }
 
+std::vector<llvm::Value *> Parser::ArgumentList(std::vector<Symbol>::iterator curr, std::vector<Symbol>::iterator end)
+{
+    PrintDebugInfo("<argument_list>");
+
+    bool continue_ = false;
+    std::vector<llvm::Value *> arguments;
+    do {
+        if (curr == end)
+        {
+            YieldError("Too many arguments", *token);
+            return arguments;
+        }
+
+        Symbol expr = Expression(*curr);
+
+        token = scanner.PeekToken();
+        expr = AssignmentTypeCheck(*curr, expr, token);
+
+        // TODO: array stuff
+
+        if (!expr.IsValid())
+        {
+            return arguments;
+        }
+
+        // TODO: array stuff
+
+        arguments.push_back(expr.GetLLVMValue());
+
+        if (ValidateToken(T_COMMA))
+        {
+            continue_ = true;
+            curr = std::next(curr);
+        }
+        else
+        {
+            if (curr != end)
+            {
+                if (std::next(curr) != end)
+                {
+                    YieldError("Not enough arguments", *token);
+                    return arguments;
+                }
+            }
+
+            continue_ = false;
+        }
+
+    } while (continue_);
+
+    return arguments;
+}
+
 llvm::Type *Parser::GetLLVMType(Symbol symbol) {
     int type = symbol.GetType();
 
@@ -1124,4 +1542,17 @@ llvm::Type *Parser::GetLLVMType(Symbol symbol) {
             std::cout << "Unknown Type" << std::endl;
             return llvm::IntegerType::getInt1Ty(llvmModule->getContext());
     }
+}
+
+llvm::Value *Parser::ConvertIntToBool(llvm::Value *intVal)
+{
+    llvm::Value *zero = llvm::ConstantInt::getIntegerValue(llvmBuilder->getInt32Ty(), llvm::APInt(32, 0, true));
+    llvm::Value *cmp = llvmBuilder->CreateICmpEQ(intVal, zero);
+
+    llvm::Value *true_ = llvm::ConstantInt::getIntegerValue(llvmBuilder->getInt1Ty(), llvm::APInt(1, 1, true));
+    llvm::Value *false_ = llvm::ConstantInt::getIntegerValue(llvmBuilder->getInt1Ty(), llvm::APInt(1, 0, true));
+
+    llvm::Value *boolVal = llvmBuilder->CreateSelect(cmp, false_, true_);
+
+    return boolVal;
 }

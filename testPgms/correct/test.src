@@ -1,8 +1,12 @@
 program test is
+    // This is a comment
     global variable x : integer;
-    variable y : integer;
-    global variable z : integer;
+    /* here is
+       another
+       comment
+    */
+    global variable y : integer;
 begin
-    y := 2;
-    //putInteger(x);
+    x := 2;
+    y := x - x * 2;
 end program.
