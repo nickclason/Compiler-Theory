@@ -628,11 +628,11 @@ void Parser::Statement() {
     }
     else if (token->type == T_FOR)
     {
-        //LoopStatement();
+        LoopStatement();
     }
     else if (token->type == T_RETURN)
     {
-        //ReturnStatement();
+        ReturnStatement();
     }
     else
     {
@@ -776,12 +776,96 @@ void Parser::IfStatement()
 
 void Parser::LoopStatement()
 {
+    PrintDebugInfo("<loop_statement>");
 
+    if (!ValidateToken(T_FOR))
+    {
+        YieldMissingTokenError("FOR", *token);
+        return;
+    }
+
+    if (!ValidateToken(T_LPAREN))
+    {
+        YieldMissingTokenError("(", *token);
+        return;
+    }
+
+    AssignmentStatement();
+
+    if (!ValidateToken(T_SEMICOLON))
+    {
+        YieldMissingTokenError(";", *token);
+        return;
+    }
+
+    // TODO: something is wrong here. for loops don't seem to be working, but LLVM IR is being generated...
+    llvm::BasicBlock *loopStart = nullptr;
+    llvm::BasicBlock *loopBody = nullptr;
+    llvm::BasicBlock *loopEnd = nullptr;
+
+    loopStart = llvm::BasicBlock::Create(llvmContext,"", llvmCurrProc);
+    loopBody = llvm::BasicBlock::Create(llvmContext,"", llvmCurrProc);
+    loopEnd = llvm::BasicBlock::Create(llvmContext,"", llvmCurrProc);
+
+    llvmBuilder->CreateBr(loopStart);
+    llvmBuilder->SetInsertPoint(loopStart);
+
+    Symbol expected = Symbol();
+    expected.SetType(T_BOOL);
+    Symbol expr = Expression(expected);
+
+    if (expr.GetType() == T_INTEGER)
+    {
+        YieldWarning("Converting integer to boolean", *token);
+        llvm::Value *val = ConvertIntToBool(expr.GetLLVMValue());
+        expr.SetLLVMValue(val);
+
+        // TODO: something is wrong here (probably in expression code)
+        //       for some reason the token does not get updated (peek is used instead
+        //       of get/ValidateToken(). Calling GetToken() twice here works for the
+        //       test.src for loop condition (but would not always work so need to fix
+
+        token=scanner.GetToken();
+        token=scanner.GetToken();
+    }
+    else if (expr.GetType() != T_BOOL)
+    {
+        YieldError("Condition in loop must evaluate to bool (or int)", *token);
+        return;
+    }
+
+    if (!ValidateToken(T_RPAREN))
+    {
+        YieldMissingTokenError(")", *token);
+        return;
+    }
+
+    llvmBuilder->CreateCondBr(expr.GetLLVMValue(), loopBody, loopEnd);
+    llvmBuilder->SetInsertPoint(loopBody);
+
+    int terminators[] = {T_END};
+    int terminatorSize = 1;
+    WhileStatements(terminators, terminatorSize);
+
+    if (token->type != T_END)
+    {
+        YieldMissingTokenError("END", *token);
+        return;
+    }
+
+    if (!ValidateToken(T_FOR))
+    {
+        YieldMissingTokenError("FOR", *token);
+        return;
+    }
+
+    llvmBuilder->CreateBr(loopStart);
+    llvmBuilder->SetInsertPoint(loopEnd);
 }
 
 void Parser::ReturnStatement()
 {
-
+    PrintDebugInfo("<return_statement>");
 }
 
 Symbol Parser::AssignmentTypeCheck(Symbol dest, Symbol expr, token_t *token)
