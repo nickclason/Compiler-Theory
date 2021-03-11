@@ -2,8 +2,9 @@ program test is
     global variable x : integer;
     global variable i : integer;
 begin
-    x := 0;
-    for (i := 0; i <= 5)
-        x := 8;
-    end for;
+    x := 10;
+    for(i := 0; i < 5)
+		x := x + i;
+		i := i + 1;
+	end for;
 end program.

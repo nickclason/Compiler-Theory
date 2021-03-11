@@ -681,6 +681,7 @@ void Parser::IfStatement()
     if (!ValidateToken(T_LPAREN))
     {
         YieldMissingTokenError("(", *token);
+        return;
     }
 
     Symbol expected = Symbol();
@@ -738,9 +739,9 @@ void Parser::IfStatement()
         llvmBuilder->SetInsertPoint(false_);
     }
 
-    int endElse[] = {T_END};
-    terminatorSize = 1;
-    WhileStatements(endElse, terminatorSize);
+//    int endElse[] = {T_END};
+//    terminatorSize = 1;
+//    WhileStatements(endElse, terminatorSize);
 
     if (token->type != T_END)
     {
