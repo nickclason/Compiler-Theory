@@ -1,12 +1,10 @@
 program test is
-    // This is a comment
     global variable x : integer;
-    /* here is
-       another
-       comment
-    */
-    global variable y : integer;
 begin
-    x := 2;
-    y := x - x * 2;
+    x := 1;
+    if (x == 1) then
+        x := 100;
+    else
+        x := 0;
+    end if;
 end program.

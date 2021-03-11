@@ -4,26 +4,8 @@
 
 #include "../include/Parser.h"
 
-#include "llvm/ADT/APFloat.h"
-#include "llvm/ADT/APInt.h"
-#include "llvm/IR/BasicBlock.h"
-#include "llvm/IR/CallingConv.h"
-#include "llvm/IR/Constant.h"
-#include "llvm/IR/Constants.h"
-#include "llvm/IR/DerivedTypes.h"
-#include "llvm/IR/GlobalValue.h"
-#include "llvm/IR/GlobalVariable.h"
-#include "llvm/IR/Instruction.h"
-#include "llvm/IR/IRPrintingPasses.h"
-#include "llvm/IR/LegacyPassManager.h"
-#include "llvm/IR/Verifier.h"
-#include "llvm/Support/FileSystem.h"
-#include "llvm/Support/Host.h"
-#include "llvm/Support/raw_ostream.h"
-#include "llvm/Support/TargetRegistry.h"
-#include "llvm/Support/TargetSelect.h"
-#include "llvm/Target/TargetMachine.h"
-#include "llvm/Target/TargetOptions.h"
+// TODO: try to rework where possible to use ValidateToken() as it provides peek, get, and eating comments functionality
+//       and not using ValidateToken() could potentially cause sync issues between the Parser token and the scanner token
 
 Parser::Parser(std::string fileName, bool debug_, Scanner scanner_, SymbolTable symbolTable_, token_t *token_)
 {
@@ -46,8 +28,6 @@ Parser::Parser(std::string fileName, bool debug_, Scanner scanner_, SymbolTable 
     if (debug)
     {
         llvmModule->print(llvm::errs(), nullptr);
-        auto target_triple = llvm::sys::getDefaultTargetTriple();
-
     }
 }
 
@@ -110,7 +90,7 @@ void Parser::ProgramBody()
     // Get all declarations
     WhileDeclarations();
 
-    if (!ValidateToken(T_BEGIN))
+    if (token->type != T_BEGIN)
     {
         YieldMissingTokenError("BEGIN", *token);
         return;
@@ -149,7 +129,7 @@ void Parser::ProgramBody()
     int terminatorsSize = 1;
     WhileStatements(terminators, terminatorsSize);
 
-    if (!ValidateToken(T_END))
+    if (!(token->type == T_END))
     {
         YieldMissingTokenError("END", *token);
         return;
@@ -172,7 +152,6 @@ void Parser::ProgramBody()
 
 bool Parser::ValidateToken(int tokenType)
 {
-
     // Ignore comments
     token_t* tempToken = scanner.PeekToken();
     while (tempToken->type == T_COMMENT)
@@ -294,8 +273,7 @@ void Parser::WhileDeclarations()
             }
         }
 
-        token = scanner.PeekToken();
-        if (token->type == T_BEGIN)
+        if (ValidateToken(T_BEGIN))
         {
             continue_ = false;
         }
@@ -536,7 +514,7 @@ void Parser::ProcedureBody() {
         symbolTable.AddSymbol(newSymbol);
     }
 
-    if (!ValidateToken(T_BEGIN)) {
+    if (token->type != T_BEGIN) {
         YieldMissingTokenError("BEGIN", *token);
         return;
     }
@@ -594,10 +572,9 @@ void Parser::WhileStatements(int terminators[], int terminatorsSize)
 {
     bool continue_ = true;
 
-    token = scanner.PeekToken();
     for (int i = 0; i < terminatorsSize; i++)
     {
-        if (token->type == terminators[i])
+        if (ValidateToken(terminators[i]))
         {
             continue_ = false;
             break;
@@ -623,13 +600,11 @@ void Parser::WhileStatements(int terminators[], int terminatorsSize)
             }
         }
 
-        token = scanner.PeekToken();
         for (int i = 0; i < terminatorsSize; i++)
         {
-            if (token->type == terminators[i])
+            if (ValidateToken(terminators[i]))
             {
                 continue_ = false;
-                token = scanner.GetToken(); // TODO: might have to change some stuff now
                 break;
             }
         }
@@ -649,7 +624,7 @@ void Parser::Statement() {
     }
     else if (token->type == T_IF)
     {
-        //IfStatement();
+        IfStatement();
     }
     else if (token->type == T_FOR)
     {
@@ -688,10 +663,125 @@ void Parser::AssignmentStatement()
 
     llvmBuilder->CreateStore(expr.GetLLVMValue(), dest.GetLLVMAddress());
     dest.SetLLVMValue(expr.GetLLVMValue());
-    //symbolTable.AddSymbol(dest); // Update symbol
+    // symbolTable.AddSymbol(dest); // Update symbol
 
     dest.SetIsInitialized(true);
     symbolTable.AddSymbol(dest); // Update
+}
+
+void Parser::IfStatement()
+{
+    PrintDebugInfo("<if_statement>");
+
+    if (!ValidateToken(T_IF))
+    {
+        YieldMissingTokenError("IF", *token);
+    }
+
+    if (!ValidateToken(T_LPAREN))
+    {
+        YieldMissingTokenError("(", *token);
+    }
+
+    Symbol expected = Symbol();
+    expected.SetType(T_BOOL);
+    Symbol expr = Expression(expected);
+
+    if (expr.GetType() == T_INTEGER)
+    {
+        YieldWarning("Converting integer to boolean", *token);
+        llvm::Value *val = ConvertIntToBool(expr.GetLLVMValue());
+        expr.SetLLVMValue(val);
+    }
+    else if (expr.GetType() != T_BOOL)
+    {
+        YieldError("If statement must evaluate to bool (or int)", *token);
+        return;
+    }
+
+    if (!ValidateToken(T_RPAREN))
+    {
+        YieldMissingTokenError(")", *token);
+        return;
+    }
+
+    if (!ValidateToken(T_THEN))
+    {
+        YieldMissingTokenError("THEN", *token);
+        return;
+    }
+
+    llvm::BasicBlock *true_ = nullptr;
+    llvm::BasicBlock *false_ = nullptr;
+    llvm::BasicBlock *end = nullptr;
+
+    true_ = llvm::BasicBlock::Create(llvmContext, "", llvmCurrProc);
+    false_ = llvm::BasicBlock::Create(llvmContext, "", llvmCurrProc);
+
+    llvmBuilder->CreateCondBr(expr.GetLLVMValue(), true_, false_);
+    llvmBuilder->SetInsertPoint(true_);
+
+    int terminators[] = {T_ELSE, T_END};
+    int terminatorSize = 2;
+    WhileStatements(terminators, terminatorSize);
+
+    // std::cout << std::to_string(token->type) << std::endl;
+    if (token->type == T_ELSE)
+    {
+        end = llvm::BasicBlock::Create(llvmContext, "", llvmCurrProc);
+
+        if (llvmBuilder->GetInsertBlock()->getTerminator() == NULL)
+        {
+            llvmBuilder->CreateBr(end);
+        }
+
+        llvmBuilder->SetInsertPoint(false_);
+    }
+
+    int endElse[] = {T_END};
+    terminatorSize = 1;
+    WhileStatements(endElse, terminatorSize);
+
+    if (token->type != T_END)
+    {
+        YieldMissingTokenError("END", *token);
+        return;
+    }
+
+    if (!ValidateToken(T_IF))
+    {
+        YieldMissingTokenError("IF", *token);
+        return;
+    }
+
+    if (end == nullptr)
+    {
+        if (llvmBuilder->GetInsertBlock()->getTerminator() == NULL)
+        {
+            llvmBuilder->CreateBr(false_);
+        }
+
+        llvmBuilder->SetInsertPoint(false_);
+    }
+    else
+    {
+        if (llvmBuilder->GetInsertBlock()->getTerminator() == NULL)
+        {
+            llvmBuilder->CreateBr(end);
+        }
+
+        llvmBuilder->SetInsertPoint(end);
+    }
+}
+
+void Parser::LoopStatement()
+{
+
+}
+
+void Parser::ReturnStatement()
+{
+
 }
 
 Symbol Parser::AssignmentTypeCheck(Symbol dest, Symbol expr, token_t *token)
