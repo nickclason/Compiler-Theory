@@ -1,10 +1,48 @@
 program test is
     global variable x : integer;
-    global variable i : integer;
+    //global variable i : integer;
 begin
-    x := 10;
-    for(i := 0; i < 5)
-		x := x + i;
-		i := i + 1;
-	end for;
+    x := -1;
+    //x := 10;
+    //for(i := 0; i < 5)
+	//	x := x + i;
+	//	i := i + 1;
+	//end for;
+
+	//return x;
+end program.
+
+
+program MultipleProcs is
+
+global variable y : integer;
+variable tmp : bool;
+
+procedure Proc1 : integer(variable val : integer)
+{
+	procedure Proc2 : integer(variable val : integer)
+	{
+		procedure Proc1 : integer(variable val : integer)
+		{
+			begin
+				val := val + 1;
+                return val;
+        } end procedure;
+		begin
+			val := val + 1;
+			val := Proc1(val);
+            return val;
+    } end procedure;
+
+	begin
+		val := val + 1;
+		val := Proc2(val);
+        return val;
+}end procedure;
+
+begin
+
+y := Proc1(y);
+tmp := putInteger(y);  // Result should be 3
+
 end program.

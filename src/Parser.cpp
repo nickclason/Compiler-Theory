@@ -617,6 +617,7 @@ void Parser::WhileStatements(int terminators[], int terminatorsSize)
 void Parser::Statement() {
     PrintDebugInfo("<statement>");
 
+    // TODO: Assignment to a negative number causes some issues?
     token = scanner.PeekToken();
     if (token->type == T_IDENTIFIER)
     {
@@ -799,7 +800,6 @@ void Parser::LoopStatement()
         return;
     }
 
-    // TODO: something is wrong here. for loops don't seem to be working, but LLVM IR is being generated...
     llvm::BasicBlock *loopStart = nullptr;
     llvm::BasicBlock *loopBody = nullptr;
     llvm::BasicBlock *loopEnd = nullptr;
@@ -867,6 +867,29 @@ void Parser::LoopStatement()
 void Parser::ReturnStatement()
 {
     PrintDebugInfo("<return_statement>");
+
+    if (!ValidateToken(T_RETURN))
+    {
+        YieldMissingTokenError("RETURN", *token);
+        return;
+    }
+
+    // TODO: not sure if this is ok. Doing it since if you return from the "main" scope it should just get swallowed
+    Symbol proc = symbolTable.GetScopeProc();
+    if (!proc.IsValid()) {
+        YieldWarning("Cannot return from this scope", *token);
+        llvm::Constant *retVal = llvm::ConstantInt::getIntegerValue(llvmBuilder->getInt32Ty(), llvm::APInt(32, 0, true));
+        llvmBuilder->CreateRet(retVal);
+        return;
+    }
+
+    Symbol expr = Expression(proc);
+    expr = AssignmentTypeCheck(proc, expr, token);
+    if (!expr.IsValid()) {
+        return;
+    }
+
+    llvmBuilder->CreateRet(expr.GetLLVMValue());
 }
 
 Symbol Parser::AssignmentTypeCheck(Symbol dest, Symbol expr, token_t *token)
@@ -1504,6 +1527,36 @@ Symbol Parser::Factor(Symbol expectedType)
     }
     else if (ValidateToken(T_SUBTRACT))
     {
+        if (ValidateToken(T_INT_LITERAL) || (ValidateToken(T_FLOAT_LITERAL)))
+        {
+            sym = Number();
+        }
+        else if (ValidateToken(T_IDENTIFIER))
+        {
+            sym = ProcedureCallOrName();
+        }
+        else
+        {
+            YieldError("Expected an identifier or number literal", *token);
+            sym.SetIsValid(false);
+            return sym;
+        }
+
+        if (sym.GetType() == T_INTEGER)
+        {
+            llvm::Value *val = llvmBuilder->CreateNeg(sym.GetLLVMValue());
+            sym.SetLLVMValue(val);
+        }
+        else if (sym.GetType() == T_FLOAT)
+        {
+            llvm::Value *val = llvmBuilder->CreateFNeg(sym.GetLLVMValue());
+            sym.SetLLVMValue(val);
+        }
+        else
+        {
+            YieldTypeMismatchError("int/float", std::to_string(sym.GetType()), *token);
+        }
+
 
     }
     else if (ValidateToken(T_INT_LITERAL) || ValidateToken(T_FLOAT_LITERAL))
