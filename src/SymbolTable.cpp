@@ -6,16 +6,19 @@
 #include "../include/SymbolTable.h"
 
 
-SymbolTable::SymbolTable() {
-
+SymbolTable::SymbolTable()
+{
+    scopeCount = -1;
 }
 
-SymbolTable::~SymbolTable() {
+SymbolTable::~SymbolTable()
+{
 
 }
 
 void SymbolTable::AddScope() {
     localScopes.push_back(std::map<std::string, Symbol>());
+    scopeCount++;
 }
 
 void SymbolTable::RemoveScope() {
@@ -27,6 +30,8 @@ void SymbolTable::RemoveScope() {
     {
         std::cout << "Error: No scope to remove" << std::endl;
     }
+
+    scopeCount--;
 }
 
 void SymbolTable::AddSymbol(Symbol &symbol) {
@@ -68,9 +73,15 @@ bool SymbolTable::DoesSymbolExist(std::string id) {
     {
         return true;
     }
+    else if (scopeCount != 0)
+    {
+        // This might solve the issue of variables that were prefixed with the global keyword not being able
+        // to be redefined in a local scope
+        return false;
+    }
 
     it = globalScope.find(id);
-    if (it != globalScope.end())
+    if (it != globalScope.end()) // TODO: global variables can be overridden in local scopes, need to fix
     {
         return true;
     }
@@ -134,4 +145,9 @@ void SymbolTable::AddIOFunctions(llvm::Module *llvmModule, llvm::LLVMContext &ll
     put_integer.SetLLVMFunction(procedure);
 
     AddSymbol(put_integer);
+}
+
+int SymbolTable::GetScopeCount()
+{
+    return scopeCount;
 }

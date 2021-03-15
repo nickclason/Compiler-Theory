@@ -11,6 +11,6 @@ program test_program is
 begin
     a := 3;
     a := f(3);
-    //tmp := putInteger(a);
+    tmp := putInteger(a);
     
 end program .

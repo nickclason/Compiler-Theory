@@ -3,9 +3,19 @@
 //
 
 #include "../include/Parser.h"
+#include <fstream>
 
+#include "llvm/Support/FileSystem.h"
+#include "llvm/Support/Host.h"
+#include "llvm/Support/raw_ostream.h"
+#include "llvm/Support/TargetRegistry.h"
+#include "llvm/Support/TargetSelect.h"
+#include "llvm/Target/TargetMachine.h"
+#include "llvm/Target/TargetOptions.h"
 // TODO: try to rework where possible to use ValidateToken() as it provides peek, get, and eating comments functionality
 //       and not using ValidateToken() could potentially cause sync issues between the Parser token and the scanner token
+
+// TODO: Add error/warning counters
 
 Parser::Parser(std::string fileName, bool debug_, Scanner scanner_, SymbolTable symbolTable_, token_t *token_)
 {
@@ -28,6 +38,12 @@ Parser::Parser(std::string fileName, bool debug_, Scanner scanner_, SymbolTable 
     if (debug)
     {
         llvmModule->print(llvm::errs(), nullptr);
+
+        fileName.erase(fileName.end()-4, fileName.end());
+        std::string outFile = fileName + ".ll";
+        std::error_code error_code;
+        llvm::raw_fd_ostream out(outFile, error_code, llvm::sys::fs::F_None);
+        llvmModule->print(out, nullptr);
     }
 }
 
@@ -51,7 +67,7 @@ Parser::~Parser()
 
 void Parser::Program()
 {
-    symbolTable.AddScope();
+    symbolTable.AddScope(); // Move this call to ProgramBody
     ProgramHeader();
     ProgramBody();
 }
@@ -254,6 +270,12 @@ std::string Parser::Identifier()
 
 void Parser::WhileDeclarations()
 {
+    // No declarations
+    if (ValidateToken(T_BEGIN))
+    {
+        return;
+    }
+
     bool continue_ = true;
     while (continue_)
     {
@@ -285,7 +307,8 @@ void Parser::Declaration()
     PrintDebugInfo("<declaration>");
 
     Symbol symbol;
-    if (ValidateToken(T_GLOBAL))
+//    if (ValidateToken(T_GLOBAL))
+    if (ValidateToken(T_GLOBAL) || symbolTable.GetScopeCount() == 0) // testing to make all declarations in outermost scope global
     {
         symbol.SetIsGlobal(true);
         if (ValidateToken(T_PROCEDURE))
@@ -364,8 +387,7 @@ void Parser::VariableDeclaration(Symbol &variable)
     symbolTable.AddSymbol(variable);
 }
 
-void Parser::ProcedureDeclaration(Symbol &procedure)
-{
+void Parser::ProcedureDeclaration(Symbol &procedure) {
     PrintDebugInfo("<procedure_declaration>");
 
     symbolTable.AddScope();
@@ -373,28 +395,24 @@ void Parser::ProcedureDeclaration(Symbol &procedure)
     ProcedureHeader(procedure);
 
     std::vector<llvm::Type *> parameters;
-    for (Symbol param : procedure.GetParameters())
-    {
-        if (param.IsArray())
-        {
+    for (Symbol param : procedure.GetParameters()) {
+        if (param.IsArray()) {
             parameters.push_back(GetLLVMType(param)->getPointerTo());
-        }
-        else
-        {
+        } else {
             parameters.push_back(GetLLVMType(param));
         }
     }
 
     llvm::FunctionType *functionType = llvm::FunctionType::get(GetLLVMType(procedure), parameters, false);
-    llvm::FunctionCallee procCallee = llvmModule->getOrInsertFunction("proc_" + std::to_string(procedureCount), functionType);
+    llvm::FunctionCallee procCallee = llvmModule->getOrInsertFunction("proc_" + std::to_string(procedureCount),
+                                                                      functionType);
     llvm::Constant *proc = llvm::dyn_cast<llvm::Constant>(procCallee.getCallee());
     procedureCount++;
     llvm::Function *func = llvm::cast<llvm::Function>(proc);
     func->setCallingConv(llvm::CallingConv::C);
     procedure.SetLLVMFunction(func);
 
-    if (symbolTable.DoesSymbolExist(procedure.GetId()))
-    {
+    if (symbolTable.DoesSymbolExist(procedure.GetId())) {
         YieldError("This identifier already exists", *token);
         return;
     }
@@ -406,13 +424,14 @@ void Parser::ProcedureDeclaration(Symbol &procedure)
 
     symbolTable.RemoveScope();
 
-    if (symbolTable.DoesSymbolExist(procedure.GetId()))
-    {
+    if (symbolTable.GetScopeCount() != 0 && symbolTable.DoesSymbolExist(procedure.GetId())) {
         YieldError("This identifier already exists", *token);
         return;
     }
 
+
     symbolTable.AddSymbol(procedure);
+
 }
 
 void Parser::ProcedureHeader(Symbol &procedure)
@@ -1565,15 +1584,15 @@ Symbol Parser::Factor(Symbol expectedType)
     }
     else if (ValidateToken(T_STRING_LITERAL))
     {
-
+        // TODO
     }
     else if (ValidateToken(T_TRUE))
     {
-
+        // TODO
     }
     else if (ValidateToken(T_FALSE))
     {
-
+        // TODO
     }
     else
     {
@@ -1707,7 +1726,7 @@ std::vector<llvm::Value *> Parser::ArgumentList(std::vector<Symbol>::iterator cu
     bool continue_ = false;
     std::vector<llvm::Value *> arguments;
     do {
-        if (curr == end)
+        if (curr == end) // TODO: might be a problem here
         {
             YieldError("Too many arguments", *token);
             return arguments;

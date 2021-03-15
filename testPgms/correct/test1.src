@@ -20,7 +20,7 @@ PROGRAM grant IS
                 variable i : integer;
 		begin
 			for(i := 0; i < zach)
-				ryan := zach + i;
+				ryan[1] := zach + i;
 			end for;
 		end procedure;
 

@@ -1,48 +1,30 @@
 program test is
-    global variable x : integer;
-    //global variable i : integer;
-begin
-    x := -1;
-    //x := 10;
-    //for(i := 0; i < 5)
-	//	x := x + i;
-	//	i := i + 1;
-	//end for;
 
-	//return x;
-end program.
+variable x : integer;
+variable z : integer;
+global variable tmp : bool;
 
+procedure myProc1 : integer(variable val : integer)
+    procedure myProc2 : integer(variable val2 : integer)
+        variable x : integer;
+        begin
+            x := 100;
+            tmp := putInteger(x);
+    end procedure;
 
-program MultipleProcs is
+    begin
+        z:= myProc2(80);
+        if (x == 100) then
+            return 1;
+        end if;
+        if (x == 0) then
+            return -1; // This should be returned
+        end if;
 
-global variable y : integer;
-variable tmp : bool;
-
-procedure Proc1 : integer(variable val : integer)
-{
-	procedure Proc2 : integer(variable val : integer)
-	{
-		procedure Proc1 : integer(variable val : integer)
-		{
-			begin
-				val := val + 1;
-                return val;
-        } end procedure;
-		begin
-			val := val + 1;
-			val := Proc1(val);
-            return val;
-    } end procedure;
-
-	begin
-		val := val + 1;
-		val := Proc2(val);
-        return val;
-}end procedure;
+end procedure;
 
 begin
-
-y := Proc1(y);
-tmp := putInteger(y);  // Result should be 3
-
+    x := 0;
+    z := myProc1(81);
+    tmp := putInteger(x);
 end program.

@@ -75,10 +75,11 @@ private:
 
     void Statement();
     void AssignmentStatement();
-    Symbol AssignmentTypeCheck(Symbol dest, Symbol expr, token_t *token);
     void IfStatement();
     void LoopStatement();
     void ReturnStatement();
+
+    Symbol AssignmentTypeCheck(Symbol dest, Symbol expr, token_t *token);
 
     Symbol ProcedureCallOrName();
     Symbol Destination();
