@@ -1,11 +1,17 @@
 program test is
     variable i : integer;
+    variable j : integer;
     variable tmp : bool;
+
+    procedure printOne : integer()
+        begin
+            i := 1;
+            return 0;
+    end procedure;
+
 begin
-
-    for (i := 0; i<5)
-        i := i+1;
-        tmp := putInteger(i);
+    for (j := 0; j < 5)
+        i := printOne();
+        j := j + 1;
     end for;
-
 end program.

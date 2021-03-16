@@ -30,6 +30,8 @@ private:
     token_t *token;
 
     int procedureCount;
+    int errorCount;
+    int warningCount;
 
     bool debug;
     bool stopParse;
@@ -46,13 +48,12 @@ private:
 
     void PrintDebugInfo(std::string langID);
 
-    void YieldError(token_t token);
-    void YieldError(std::string msg, token_t token);
-    void YieldMissingTokenError(std::string expected, token_t token);
-    void YieldTypeMismatchError(std::string expected, std::string actual, token_t token);
-    void YieldOpTypeCheckError(std::string op, std::string type1, std::string type2, token_t token);
+    void ReportError(std::string msg, token_t token);
+    void ReportMissingTokenError(std::string expected, token_t token);
+    void ReportTypeMismatchError(std::string expected, std::string actual, token_t token);
+    void ReportOpTypeCheckError(std::string op, std::string type1, std::string type2, token_t token);
 
-    void YieldWarning(std::string msg, token_t token);
+    void ReportWarning(std::string msg, token_t token);
 
     void Resync(token_t tokens[], int length);
 
