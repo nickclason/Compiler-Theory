@@ -2,7 +2,7 @@ Program MyTestProgram is
 
 variable i : integer;
 variable c : string;
-//variable myArray : integer[15];
+variable myArray : integer[15];
 
 begin
 

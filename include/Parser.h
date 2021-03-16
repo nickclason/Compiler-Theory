@@ -46,6 +46,8 @@ private:
     // General/Utility Functions
     bool ValidateToken(int tokenType);
 
+    std::string TypeToString(int tokenType);
+
     void PrintDebugInfo(std::string langID);
 
     void ReportError(std::string msg, token_t token);

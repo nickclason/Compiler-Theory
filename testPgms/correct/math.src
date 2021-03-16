@@ -1,7 +1,7 @@
 program Maths is
 
-global variable value : integer;
-global variable tmp2 : float;  //this variable will be hidden by the declaration in Fib
+variable value : integer;
+variable tmp2 : float;  //this variable will be hidden by the declaration in Fib
 variable out : bool;
 
 procedure Fib : integer(variable val : integer)
@@ -29,6 +29,5 @@ begin
 
 value := Fib(15);
 out := putInteger(value);
-tmp2 := 101.2;
 
 end program.

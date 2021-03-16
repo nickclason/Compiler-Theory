@@ -12,8 +12,6 @@
 // TODO: try to rework where possible to use ValidateToken() as it provides peek, get, and eating comments functionality
 //       and not using ValidateToken() could potentially cause sync issues between the Parser token and the scanner token
 
-// TODO: Add error/warning counters
-
 Parser::Parser(std::string fileName, bool debug_, Scanner scanner_, SymbolTable symbolTable_, token_t *token_)
 {
     debug = debug_;
@@ -32,7 +30,6 @@ Parser::Parser(std::string fileName, bool debug_, Scanner scanner_, SymbolTable 
     llvmBuilder = nullptr;
     llvmCurrProc = nullptr;
 
-    // TODO: start parsing
     Program();
     if (debug)
     {
@@ -198,6 +195,28 @@ bool Parser::ValidateToken(int tokenType)
     return false;
 }
 
+std::string Parser::TypeToString(int tokenType)
+{
+    switch (tokenType)
+    {
+        case (T_INTEGER):
+            return "INTEGER";
+            break;
+        case (T_FLOAT):
+            return "FLOAT";
+            break;
+        case (T_BOOL):
+            return "BOOL";
+            break;
+        case (T_STRING):
+            return "STRING";
+            break;
+        default:
+            return "Unknown Type";
+            break;
+    }
+}
+
 void Parser::PrintDebugInfo(std::string langID)
 {
     if (debug)
@@ -232,8 +251,8 @@ void Parser::ReportTypeMismatchError(std::string expected, std::string actual, t
     if (errorFlag) return;
 
     std::cout << "Line: " << token.line << " Col: " << token.col << " : " << std::endl;
-    std::cout << "Expected Type: " << expected << std::endl;
-    std::cout << "Found Type: " << actual << std::endl;
+    std::cout << "\tExpected Type: " << expected << std::endl;
+    std::cout << "\tFound Type: " << actual << std::endl;
     errorFlag = true;
     errorCount++;
 }
@@ -631,9 +650,6 @@ void Parser::WhileStatements(int terminators[], int terminatorsSize)
             }
         }
     }
-
-
-
 }
 
 void Parser::Statement() {
@@ -951,7 +967,7 @@ Symbol Parser::AssignmentTypeCheck(Symbol dest, Symbol expr, token_t *token)
 
         if (isDiff)
         {
-            ReportTypeMismatchError(std::to_string(dest.GetType()), std::to_string(expr.GetType()), *token);
+            ReportTypeMismatchError(TypeToString(dest.GetType()), TypeToString(expr.GetType()), *token);
             expr.SetIsValid(false);
             return expr;
         }
@@ -1057,8 +1073,7 @@ Symbol Parser::ExpressionTypeCheck(Symbol expectedType, Symbol arithOp, Symbol e
 
         if (!isInterop)
         {
-            // TODO: convert types to human readable strings
-            ReportOpTypeCheckError(opStr, std::to_string(arithOp.GetType()), std::to_string(exprTail.GetType()), *op);
+            ReportOpTypeCheckError(opStr, TypeToString(arithOp.GetType()), TypeToString(exprTail.GetType()), *op);
             sym.SetIsValid(false);
 
             return sym;
@@ -1103,8 +1118,7 @@ Symbol Parser::ExpressionTypeCheck(Symbol expectedType, Symbol arithOp, Symbol e
 
             if (!isInterop)
             {
-                // TODO: convert type to human readable strings
-                ReportOpTypeCheckError("binary", std::to_string(arithOp.GetType()), "null", *op);
+                ReportOpTypeCheckError("binary", TypeToString(arithOp.GetType()), "null", *op);
 
                 Symbol sym = Symbol();
                 sym.SetIsValid(false);
@@ -1179,8 +1193,7 @@ Symbol Parser::ArithOpTypeCheck(Symbol expectedType, Symbol rel, Symbol tail, to
 
         if (!isInterop)
         {
-            // TODO: convert types to readable format
-            ReportOpTypeCheckError("arith", std::to_string(rel.GetType()), std::to_string(tail.GetType()), *op);
+            ReportOpTypeCheckError("arith", TypeToString(rel.GetType()), TypeToString(tail.GetType()), *op);
             sym.SetIsValid(false);
 
             return sym;
@@ -1362,8 +1375,7 @@ Symbol Parser::RelationTypeCheck(Symbol expectedType, Symbol term, Symbol relTai
 
         if (!isInterop)
         {
-            // make types readable
-            ReportOpTypeCheckError("relational", std::to_string(term.GetType()), std::to_string(relTail.GetType()), *op);
+            ReportOpTypeCheckError("relational", TypeToString(term.GetType()), TypeToString(relTail.GetType()), *op);
             sym.SetIsValid(false);
             return sym;
         }
@@ -1567,7 +1579,7 @@ Symbol Parser::Factor(Symbol expectedType)
         }
         else
         {
-            ReportTypeMismatchError("int/float", std::to_string(sym.GetType()), *token);
+            ReportTypeMismatchError("int/float", TypeToString(sym.GetType()), *token);
         }
 
 
