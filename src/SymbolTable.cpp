@@ -81,7 +81,7 @@ bool SymbolTable::DoesSymbolExist(std::string id) {
     }
 
     it = globalScope.find(id);
-    if (it != globalScope.end()) // TODO: global variables can be overridden in local scopes, need to fix
+    if (it != globalScope.end())
     {
         return true;
     }

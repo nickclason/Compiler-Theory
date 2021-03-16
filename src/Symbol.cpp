@@ -24,7 +24,6 @@ Symbol::Symbol() {
 }
 
 Symbol::~Symbol() {
-    // TODO
 }
 
 void Symbol::PrintDebugInfo() {

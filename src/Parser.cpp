@@ -3,15 +3,12 @@
 //
 
 #include "../include/Parser.h"
+
 #include <fstream>
 
 #include "llvm/Support/FileSystem.h"
-#include "llvm/Support/Host.h"
 #include "llvm/Support/raw_ostream.h"
-#include "llvm/Support/TargetRegistry.h"
-#include "llvm/Support/TargetSelect.h"
-#include "llvm/Target/TargetMachine.h"
-#include "llvm/Target/TargetOptions.h"
+
 // TODO: try to rework where possible to use ValidateToken() as it provides peek, get, and eating comments functionality
 //       and not using ValidateToken() could potentially cause sync issues between the Parser token and the scanner token
 
@@ -67,7 +64,7 @@ Parser::~Parser()
 
 void Parser::Program()
 {
-    symbolTable.AddScope(); // Move this call to ProgramBody
+    symbolTable.AddScope();
     ProgramHeader();
     ProgramBody();
 }
@@ -498,8 +495,6 @@ void Parser::ProcedureBody() {
     llvmBuilder->SetInsertPoint(procEntry);
 
     std::map<std::string, Symbol>::iterator it;
-    //for (it = symbolTable.GetLocalScope().begin(); it != symbolTable.GetLocalScope().end(); it++) {
-    // Not sure if this will work, might need pointer
     for (auto &it : symbolTable.GetLocalScope())
     {
         if (it.second.GetDeclarationType() != T_VARIABLE) {
@@ -636,7 +631,6 @@ void Parser::WhileStatements(int terminators[], int terminatorsSize)
 void Parser::Statement() {
     PrintDebugInfo("<statement>");
 
-    // TODO: Assignment to a negative number causes some issues?
     token = scanner.PeekToken();
     if (token->type == T_IDENTIFIER)
     {
@@ -839,14 +833,6 @@ void Parser::LoopStatement()
         YieldWarning("Converting integer to boolean", *token);
         llvm::Value *val = ConvertIntToBool(expr.GetLLVMValue());
         expr.SetLLVMValue(val);
-
-        // TODO: something is wrong here (probably in expression code)
-        //       for some reason the token does not get updated (peek is used instead
-        //       of get/ValidateToken(). Calling GetToken() twice here works for the
-        //       test.src for loop condition (but would not always work so need to fix
-
-        token=scanner.GetToken();
-        token=scanner.GetToken();
     }
     else if (expr.GetType() != T_BOOL)
     {
@@ -982,7 +968,7 @@ Symbol Parser::Destination()
     if (dest.GetDeclarationType() != T_VARIABLE)
     {
         YieldError("Variable required for valid destination", *token);
-        dest = Symbol(); // TODO: might need to generate a unique random identifier for this symbol
+        dest = Symbol();
         dest.SetIsValid(false);
         return dest;
     }
@@ -1018,7 +1004,7 @@ Symbol Parser::ExpressionTail(Symbol expectedType)
 {
     PrintDebugInfo("<expression_tail>");
 
-    if (ValidateToken(T_AND) || ValidateToken(T_AND))
+    if (ValidateToken(T_AND) || ValidateToken(T_OR))
     {
         Symbol arithOp = ArithOp(expectedType);
         token_t *op = scanner.PeekToken();
@@ -1584,15 +1570,19 @@ Symbol Parser::Factor(Symbol expectedType)
     }
     else if (ValidateToken(T_STRING_LITERAL))
     {
-        // TODO
+        sym = String();
     }
     else if (ValidateToken(T_TRUE))
     {
-        // TODO
+        sym.SetType(T_BOOL);
+        llvm::Value *val = llvm::ConstantInt::getIntegerValue(GetLLVMType(sym),llvm::APInt(1, 1, true));
+        sym.SetLLVMValue(val);
     }
     else if (ValidateToken(T_FALSE))
     {
-        // TODO
+        sym.SetType(T_BOOL);
+        llvm::Value *val = llvm::ConstantInt::getIntegerValue(GetLLVMType(sym),llvm::APInt(1, 0, true));
+        sym.SetLLVMValue(val);
     }
     else
     {
@@ -1719,6 +1709,24 @@ Symbol Parser::Number()
     return sym;
 }
 
+Symbol Parser::String()
+{
+    PrintDebugInfo("<string>");
+
+    Symbol sym = Symbol();
+    if (token->type != T_STRING_LITERAL)
+    {
+        YieldError("String literal expected.", *token);
+        return sym;
+    }
+
+    sym.SetType(T_STRING);
+    llvm::Value *val = llvmBuilder->CreateGlobalStringPtr(token->val.stringValue);
+    sym.SetLLVMValue(val);
+
+    return sym;
+}
+
 std::vector<llvm::Value *> Parser::ArgumentList(std::vector<Symbol>::iterator curr, std::vector<Symbol>::iterator end)
 {
     PrintDebugInfo("<argument_list>");
@@ -1726,7 +1734,7 @@ std::vector<llvm::Value *> Parser::ArgumentList(std::vector<Symbol>::iterator cu
     bool continue_ = false;
     std::vector<llvm::Value *> arguments;
     do {
-        if (curr == end) // TODO: might be a problem here
+        if (curr == end) // TODO: might be a problem here with empty arg lists
         {
             YieldError("Too many arguments", *token);
             return arguments;

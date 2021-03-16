@@ -100,9 +100,9 @@ private:
     Symbol TermTail(Symbol expectedType);
 
     Symbol Factor(Symbol expectedType);
-//    Symbol Name();
     Symbol Number();
     Symbol String();
+    // Symbol Name();
 
     std::string Identifier();
 
