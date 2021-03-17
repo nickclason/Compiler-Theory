@@ -35,8 +35,10 @@ Parser::Parser(std::string fileName, bool debug_, Scanner scanner_, SymbolTable 
     {
         //llvmModule->print(llvm::errs(), nullptr);
 
+        fileName.erase(fileName.begin(), fileName.begin()+55);
+
         fileName.erase(fileName.end()-4, fileName.end());
-        std::string outFile = fileName + ".ll";
+        std::string outFile = "/Users/nick/Documents/Compiler-Theory/out/" + fileName + ".ll";
         std::error_code error_code;
         llvm::raw_fd_ostream out(outFile, error_code, llvm::sys::fs::F_None);
         llvmModule->print(out, nullptr);
@@ -835,8 +837,14 @@ void Parser::IfStatement()
         }
 
         llvmBuilder->SetInsertPoint(false_);
+
+        // TODO: need to fix this, tokens are getting out of sync somewhere
+        int endElse[] = {T_END};
+        terminatorSize = 1;
+        WhileStatements(endElse, terminatorSize);
     }
 
+//    // TODO: need to fix this, tokens are getting out of sync somewhere
 //    int endElse[] = {T_END};
 //    terminatorSize = 1;
 //    WhileStatements(endElse, terminatorSize);
@@ -1435,6 +1443,7 @@ Symbol Parser::RelationTail(Symbol expectedType)
 
     if (ValidateToken(T_LESSTHAN) ||
         ValidateToken(T_GREATERTHAN) ||
+        ValidateToken(T_LTEQ) ||
         ValidateToken(T_GTEQ) ||
         ValidateToken(T_EQEQ) ||
         ValidateToken(T_NOTEQ))
