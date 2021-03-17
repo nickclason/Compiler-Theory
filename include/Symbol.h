@@ -45,6 +45,9 @@ public:
     bool IsValid() const;
     void SetIsValid(bool isValid);
 
+    bool IsArrayIndexed() const;
+    void SetIsArrayIndexed(bool isIndexed);
+
     std::vector<Symbol> &GetParameters();
     void SetParameters(const std::vector<Symbol> &parameters);
 
@@ -57,8 +60,8 @@ public:
     llvm::Value *GetLLVMArrayAddress() const;
     void SetLLVMArrayAddress(llvm::Value *llvmArrayAddress);
 
-    llvm::Value *GetLLVMArrayBound() const;
-    void SetLLVMArrayBound(llvm::Value *llvmArrayBound);
+    llvm::Value *GetLLVMArraySize() const;
+    void SetLLVMArraySize(llvm::Value *llvmArraySize);
 
     llvm::Function *GetLLVMFunction() const;
     void SetLLVMFunction(llvm::Function *llvmFunction);
@@ -75,6 +78,7 @@ private:
     bool isGlobal;
     bool isInitialized;
     bool isValid;
+    bool isIndexed;
 
     std::vector<Symbol> parameters;
 
@@ -82,7 +86,7 @@ private:
     llvm::Value *llvmAddress;
     llvm::Value *llvmValue;
     llvm::Value *llvmArrayAddress;
-    llvm::Value *llvmArrayBound;
+    llvm::Value *llvmArraySize;
     llvm::Function *llvmFunction;
 };
 

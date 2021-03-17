@@ -82,6 +82,8 @@ private:
     void LoopStatement();
     void ReturnStatement();
 
+
+    Symbol IndexArray(Symbol symbol);
     Symbol AssignmentTypeCheck(Symbol dest, Symbol expr, token_t *token);
 
     Symbol ProcedureCallOrName();

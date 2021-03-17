@@ -33,7 +33,7 @@ Parser::Parser(std::string fileName, bool debug_, Scanner scanner_, SymbolTable 
     Program();
     if (debug)
     {
-        llvmModule->print(llvm::errs(), nullptr);
+        //llvmModule->print(llvm::errs(), nullptr);
 
         fileName.erase(fileName.end()-4, fileName.end());
         std::string outFile = fileName + ".ll";
@@ -385,21 +385,48 @@ void Parser::VariableDeclaration(Symbol &variable)
 
     TypeMark(variable);
 
-    // TODO: array
+    // Array
+    if (ValidateToken(T_LBRACKET))
+    {
+        variable.SetIsArray(true);
+        Bound(variable);
+
+        if (!ValidateToken(T_RBRACKET))
+        {
+            ReportMissingTokenError("]", *token);
+            return;
+        }
+    }
 
     if (variable.IsGlobal())
     {
         llvm::Type *globalTy = nullptr;
 
-        // array
+        // Array
+        if (variable.IsArray())
+        {
+            globalTy = llvm::ArrayType::get(GetLLVMType(variable), variable.GetArraySize());
+        }
+        else
+        {
+            globalTy = GetLLVMType(variable);
+        }
 
-        globalTy = GetLLVMType(variable);
         llvm::Constant *constInit = llvm::Constant::getNullValue(globalTy);
         llvm::Value *val = new llvm::GlobalVariable(*llvmModule, globalTy, false, llvm::GlobalValue::CommonLinkage, constInit, variable.GetId());
         variable.SetIsInitialized(true);
 
-        // array
-        variable.SetLLVMAddress(val);
+        // Array
+        if (variable.IsArray())
+        {
+            variable.SetLLVMArrayAddress(val);
+            llvm::Value *size = llvm::ConstantInt::getIntegerValue(llvmBuilder->getInt32Ty(), llvm::APInt(32, variable.GetArraySize(), true));
+            variable.SetLLVMArraySize(size);
+        }
+        else
+        {
+            variable.SetLLVMAddress(val);
+        }
     }
 
     if (symbolTable.DoesSymbolExist(variable.GetId()))
@@ -528,11 +555,23 @@ void Parser::ProcedureBody() {
             continue;
         }
 
-        // TODO: array stuff
-
         llvm::Value *address = nullptr;
-        address = llvmBuilder->CreateAlloca(GetLLVMType(it.second));
-        it.second.SetLLVMAddress(address);
+
+        // Array
+        if (it.second.IsArray())
+        {
+            llvm::Value *size = llvm::ConstantInt::getIntegerValue(llvmBuilder->getInt32Ty(), llvm::APInt(32, it.second.GetArraySize(), true));
+            it.second.SetLLVMArraySize(size);
+
+            address = llvmBuilder->CreateAlloca(GetLLVMType(it.second), size);
+            it.second.SetLLVMArrayAddress(address);
+            it.second.SetIsInitialized(true);
+        }
+        else
+        {
+            address = llvmBuilder->CreateAlloca(GetLLVMType(it.second));
+            it.second.SetLLVMAddress(address);
+        }
 
         symbolTable.AddSymbol(it.second);
     }
@@ -545,12 +584,18 @@ void Parser::ProcedureBody() {
         }
 
         llvm::Value *val = &*args++;
-
         Symbol newSymbol = symbolTable.FindSymbol(sym.GetId());
         newSymbol.SetLLVMValue(val);
         newSymbol.SetIsInitialized(true);
-        // TODO: array stuff
-        llvmBuilder->CreateStore(val, newSymbol.GetLLVMAddress());
+
+        if (newSymbol.IsArray())
+        {
+            newSymbol.SetLLVMArrayAddress(val); // TODO: need to pass arrays by value, so the array needs to be copied instead of just reusing the address?
+        }
+        else
+        {
+            llvmBuilder->CreateStore(val, newSymbol.GetLLVMAddress());
+        }
 
         symbolTable.AddSymbol(newSymbol);
     }
@@ -607,6 +652,21 @@ void Parser::TypeMark(Symbol &symbol)
         return;
     }
 
+}
+
+void Parser::Bound(Symbol &symbol)
+{
+    PrintDebugInfo("<bound>");
+
+    if (!ValidateToken(T_INT_LITERAL))
+    {
+        ReportMissingTokenError("Integer literal", *token);
+        return;
+    }
+
+    Symbol bound = Number();
+    int size = token->val.intValue;
+    bound.SetArraySize(size);
 }
 
 void Parser::WhileStatements(int terminators[], int terminatorsSize)
@@ -921,6 +981,76 @@ void Parser::ReturnStatement()
     llvmBuilder->CreateRet(expr.GetLLVMValue());
 }
 
+Symbol Parser::IndexArray(Symbol symbol)
+{
+    symbol.SetIsArrayIndexed(true);
+
+    Symbol sym = Symbol();
+    if (ValidateToken(T_LBRACKET))
+    {
+        ReportMissingTokenError("[", *token);
+
+        sym.SetIsValid(false);
+        return sym;
+    }
+
+    sym.SetType(T_INTEGER);
+    Symbol idx = Expression(sym);
+    idx = AssignmentTypeCheck(sym, idx, token);
+
+    if (idx.GetType() != T_INTEGER)
+    {
+        ReportError("Array index must be an integer.", *token);
+        symbol.SetIsValid(false);
+        return symbol;
+    }
+
+    if (!symbol.IsArray())
+    {
+        ReportError("Indexing not supported for non-arrays", *token);
+        symbol.SetIsValid(false);
+        return symbol;
+    }
+
+    if (!ValidateToken(T_RBRACKET))
+    {
+        ReportMissingTokenError("]", *token);
+        symbol.SetIsValid(false);
+        return symbol;
+    }
+
+    llvm::Value *zero = llvm::ConstantInt::getIntegerValue(llvmBuilder->getInt32Ty(), llvm::APInt(32, 0, true));
+    llvm::Value *greater = llvmBuilder->CreateICmpSGE(idx.GetLLVMValue(), zero);
+    llvm::Value *less = llvmBuilder->CreateICmpSLT(idx.GetLLVMValue(), symbol.GetLLVMArraySize());
+    llvm::Value *actualIdx = llvmBuilder->CreateAnd(greater, less);
+
+    llvm::BasicBlock *fail = llvm::BasicBlock::Create(llvmContext, "", llvmCurrProc);
+    llvm::BasicBlock *succ = llvm::BasicBlock::Create(llvmContext, "", llvmCurrProc);
+
+    llvmBuilder->CreateCondBr(actualIdx, succ, fail);
+    llvmBuilder->SetInsertPoint(fail);
+
+    // TODO: Need to somehow call a function to quit runniong if there is an index error?
+
+    llvmBuilder->CreateBr(succ);
+    llvmBuilder->SetInsertPoint(succ);
+
+    llvm::Value *address = nullptr;
+    if (symbol.IsGlobal())
+    {
+        llvm::Value *vals[] = {zero, idx.GetLLVMValue()};
+        address = llvmBuilder->CreateInBoundsGEP(symbol.GetLLVMArrayAddress(), vals);
+    }
+    else
+    {
+        address = llvmBuilder->CreateGEP(symbol.GetLLVMArrayAddress(), idx.GetLLVMValue());
+    }
+
+    symbol.SetLLVMAddress(address);
+
+    return symbol;
+}
+
 Symbol Parser::AssignmentTypeCheck(Symbol dest, Symbol expr, token_t *token)
 {
     if (dest.GetType() != expr.GetType())
@@ -999,12 +1129,12 @@ Symbol Parser::Destination()
 
     if (ValidateToken(T_LBRACKET))
     {
-        // TODO: array
-        // dest = Index();
+        // get index
+        dest = IndexArray(dest);
     }
     else
     {
-        // TODO: array unwrapping
+        // TODO: no index was supplied array unwrapping
     }
 
     // If we get here, the destination is valid and not an array
@@ -1687,7 +1817,26 @@ Symbol Parser::ProcedureCallOrName()
             return sym;
         }
 
-        // TODO: array stuff
+        if (ValidateToken(T_LBRACKET))
+        {
+            if (sym.GetDeclarationType() != T_VARIABLE)
+            {
+                ReportError("Indexing is not supported for non-arrays.", *token);
+                sym = Symbol();
+                sym.SetIsValid(false);
+                return sym;
+            }
+
+            sym = IndexArray(sym);
+        }
+//        else if (unwrapArray)
+//        {
+            // TODO: Array unwrapping
+//        }
+        else
+        {
+            sym.SetIsArrayIndexed(false);
+        }
 
         if (sym.GetDeclarationType() == T_VARIABLE)
         {
@@ -1699,9 +1848,15 @@ Symbol Parser::ProcedureCallOrName()
                 return sym;
             }
 
-            // TODO: array
-            llvm::Value *val = llvmBuilder->CreateLoad(GetLLVMType(sym), sym.GetLLVMAddress());
-            sym.SetLLVMValue(val);
+            if (sym.IsArray() && !sym.IsArrayIndexed())
+            {
+                // TODO: copy array into the val?
+            }
+            else
+            {
+                llvm::Value *val = llvmBuilder->CreateLoad(GetLLVMType(sym), sym.GetLLVMAddress());
+                sym.SetLLVMValue(val);
+            }
         }
     }
 
@@ -1764,16 +1919,44 @@ std::vector<llvm::Value *> Parser::ArgumentList(std::vector<Symbol>::iterator cu
         Symbol expr = Expression(*curr);
         expr = AssignmentTypeCheck(*curr, expr, token);
 
-        // TODO: array stuff
+        if (curr->IsArray())
+        {
+            if (curr->GetArraySize() != expr.GetArraySize() || expr.IsArrayIndexed())
+            {
+                ReportError("Array expected as argument", *token);
+                return arguments;
+            }
+        }
+        else if (expr.IsArray() && !expr.IsArrayIndexed())
+        {
+            ReportError("Invalid argument: array not expected", *token);
+            return arguments;
+        }
+
 
         if (!expr.IsValid())
         {
             return arguments;
         }
 
-        // TODO: array stuff
-
-        arguments.push_back(expr.GetLLVMValue());
+        if (expr.IsArray() && !expr.IsArrayIndexed())
+        {
+            if (expr.IsGlobal())
+            {
+                llvm::Value *zero = llvm::ConstantInt::getIntegerValue(llvmBuilder->getInt32Ty(), llvm::APInt(32, 0, true));
+                llvm::Value *val = llvmBuilder->CreateInBoundsGEP(expr.GetLLVMArrayAddress(), zero);
+                val = llvmBuilder->CreateBitCast(val, GetLLVMType(expr)->getPointerTo());
+                arguments.push_back(val);
+            }
+            else
+            {
+                arguments.push_back(expr.GetLLVMValue());
+            }
+        }
+        else
+        {
+            arguments.push_back(expr.GetLLVMValue());
+        }
 
         if (ValidateToken(T_COMMA))
         {

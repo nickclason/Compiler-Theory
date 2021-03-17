@@ -15,11 +15,12 @@ Symbol::Symbol() {
     isGlobal = false;
     isInitialized = false;
     isValid = true;
+    isIndexed = false;
 
     llvmAddress = nullptr;
     llvmValue = nullptr;
     llvmArrayAddress = nullptr;
-    llvmArrayBound = nullptr;
+    llvmArraySize = nullptr;
     llvmFunction = nullptr;
 }
 
@@ -94,6 +95,14 @@ void Symbol::SetIsValid(bool isValid) {
     Symbol::isValid = isValid;
 }
 
+bool Symbol::IsArrayIndexed() const {
+    return isIndexed;
+}
+
+void Symbol::SetIsArrayIndexed(bool isIndexed) {
+    Symbol::isIndexed = isIndexed;
+}
+
 std::vector<Symbol> &Symbol::GetParameters() {
     return parameters;
 }
@@ -126,12 +135,12 @@ void Symbol::SetLLVMArrayAddress(llvm::Value *llvmArrayAddress) {
     Symbol::llvmArrayAddress = llvmArrayAddress;
 }
 
-llvm::Value *Symbol::GetLLVMArrayBound() const {
-    return llvmArrayBound;
+llvm::Value *Symbol::GetLLVMArraySize() const {
+    return llvmArraySize;
 }
 
-void Symbol::SetLLVMArrayBound(llvm::Value *llvmArrayBound) {
-    Symbol::llvmArrayBound = llvmArrayBound;
+void Symbol::SetLLVMArraySize(llvm::Value *llvmArraySize) {
+    Symbol::llvmArraySize = llvmArraySize;
 }
 
 llvm::Function *Symbol::GetLLVMFunction() const {
