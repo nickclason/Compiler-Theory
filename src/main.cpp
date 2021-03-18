@@ -65,7 +65,7 @@ int main()
     scanner.InitScanner(fileName);
     token_t *token = new token_t();
 
-    Parser *p = new Parser(fileName, true, scanner, symbolTable, token);
+    Parser *p = new Parser(fileName, false, scanner, symbolTable, token);
 
     return 0;
 }

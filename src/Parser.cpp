@@ -9,8 +9,7 @@
 #include "llvm/Support/FileSystem.h"
 #include "llvm/Support/raw_ostream.h"
 
-// TODO: try to rework where possible to use ValidateToken() as it provides peek, get, and eating comments functionality
-//       and not using ValidateToken() could potentially cause sync issues between the Parser token and the scanner token
+// TODO: CreateFAdd/Sub/Cmp/etc change "" to addtmp, multmp, subtmp, etc
 
 Parser::Parser(std::string fileName, bool debug_, Scanner scanner_, SymbolTable symbolTable_, token_t *token_)
 {
@@ -35,6 +34,20 @@ Parser::Parser(std::string fileName, bool debug_, Scanner scanner_, SymbolTable 
     {
         //llvmModule->print(llvm::errs(), nullptr);
 
+//        fileName.erase(fileName.begin(), fileName.begin()+57);
+//
+//        fileName.erase(fileName.end()-4, fileName.end());
+//        std::string outFile = "/Users/nick/Documents/Compiler-Theory/out/" + fileName + ".ll";
+//        std::error_code error_code;
+//        llvm::raw_fd_ostream out(outFile, error_code, llvm::sys::fs::F_None);
+//        llvmModule->print(out, nullptr);
+    }
+
+
+    if (!errorFlag && errorCount == 0)
+    {
+        std::cout << "Parse was successful." << std::endl;
+
         fileName.erase(fileName.begin(), fileName.begin()+55);
 
         fileName.erase(fileName.end()-4, fileName.end());
@@ -43,30 +56,9 @@ Parser::Parser(std::string fileName, bool debug_, Scanner scanner_, SymbolTable 
         llvm::raw_fd_ostream out(outFile, error_code, llvm::sys::fs::F_None);
         llvmModule->print(out, nullptr);
     }
-
-    if (!errorFlag && errorCount == 0)
-    {
-        std::cout << "Parse was successful." << std::endl;
-    }
 }
 
-Parser::~Parser()
-{
-    if (llvmBuilder != nullptr)
-    {
-        delete llvmBuilder;
-    }
-
-    if (llvmCurrProc != nullptr)
-    {
-        delete llvmCurrProc;
-    }
-
-    if (llvmModule != nullptr)
-    {
-        delete llvmModule;
-    }
-}
+Parser::~Parser()=default;
 
 void Parser::Program()
 {
@@ -81,7 +73,7 @@ void Parser::ProgramHeader()
 
     if (!ValidateToken(T_PROGRAM))
     {
-        ReportMissingTokenError("PROGRAM", *token);
+        ReportMissingTokenError("PROGRAM");
         return;
     }
 
@@ -95,11 +87,9 @@ void Parser::ProgramHeader()
 
     if (!ValidateToken(T_IS))
     {
-        ReportMissingTokenError("IS", *token);
+        ReportMissingTokenError("IS");
         return;
     }
-
-    return;
 }
 
 void Parser::ProgramBody()
@@ -111,7 +101,7 @@ void Parser::ProgramBody()
 
     if (token->type != T_BEGIN)
     {
-        ReportMissingTokenError("BEGIN", *token);
+        ReportMissingTokenError("BEGIN");
         return;
     }
 
@@ -119,7 +109,8 @@ void Parser::ProgramBody()
     llvm::FunctionType *functionType = llvm::FunctionType::get(llvmBuilder->getInt32Ty(), parameters, false);
 
     llvm::FunctionCallee mainCallee = llvmModule->getOrInsertFunction("main", functionType);
-    llvm::Constant *main = llvm::dyn_cast<llvm::Constant>(mainCallee.getCallee());
+//    llvm::Constant *main = llvm::dyn_cast<llvm::Constant>(mainCallee.getCallee());
+    auto *main = llvm::dyn_cast<llvm::Constant>(mainCallee.getCallee());
 
     llvmCurrProc = llvm::cast<llvm::Function>(main);
     llvmCurrProc->setCallingConv(llvm::CallingConv::C);
@@ -150,23 +141,21 @@ void Parser::ProgramBody()
 
     if (!(token->type == T_END))
     {
-        ReportMissingTokenError("END", *token);
+        ReportMissingTokenError("END");
         return;
     }
 
     if (!ValidateToken(T_PROGRAM))
     {
-        ReportMissingTokenError("PROGRAM", *token);
+        ReportMissingTokenError("PROGRAM");
         return;
     }
 
-    if (llvmBuilder->GetInsertBlock()->getTerminator() == NULL)
+    if (llvmBuilder->GetInsertBlock()->getTerminator() == nullptr)
     {
         llvm::Constant *retVal = llvm::ConstantInt::getIntegerValue(llvmBuilder->getInt32Ty(), llvm::APInt(32, 0, true));
         llvmBuilder->CreateRet(retVal);
     }
-
-    return;
 }
 
 bool Parser::ValidateToken(int tokenType)
@@ -186,7 +175,7 @@ bool Parser::ValidateToken(int tokenType)
     }
     else if (tempToken->type == T_UNKNOWN)
     {
-        ReportError("Unknown token was found", *token);
+        ReportError("Unknown token was found");
         return false;
     }
     else if (tempToken->type == T_EOF)
@@ -203,19 +192,14 @@ std::string Parser::TypeToString(int tokenType)
     {
         case (T_INTEGER):
             return "INTEGER";
-            break;
         case (T_FLOAT):
             return "FLOAT";
-            break;
         case (T_BOOL):
             return "BOOL";
-            break;
         case (T_STRING):
             return "STRING";
-            break;
         default:
             return "Unknown Type";
-            break;
     }
 }
 
@@ -227,44 +211,40 @@ void Parser::PrintDebugInfo(std::string langID)
     }
 }
 
-void Parser::ReportError(std::string msg, token_t token)
+void Parser::ReportError(std::string msg)
 {
-    token = *scanner.PeekToken();
     if (errorFlag) return;
 
-    std::cout << "Line: " << token.line << " Col: " << token.col << " : " << msg << std::endl;
+    std::cout << "Line: " << token->line << " Col: " << token->col << " : " << msg << std::endl;
     errorFlag = true;
     errorCount++;
 }
 
-void Parser::ReportMissingTokenError(std::string expected, token_t token)
+void Parser::ReportMissingTokenError(std::string expected)
 {
-    token = *scanner.PeekToken();
     if (errorFlag) return;
 
-    std::cout << "Line: " << token.line << " Col: " << token.col << " : " << "Expected token " << expected << std::endl;
+    std::cout << "Line: " << token->line << " Col: " << token->col << " : " << "Expected token " << expected << std::endl;
     errorFlag = true;
     errorCount++;
 }
 
-void Parser::ReportTypeMismatchError(std::string expected, std::string actual, token_t token)
+void Parser::ReportTypeMismatchError(std::string expected, std::string actual)
 {
-    token = *scanner.PeekToken();
     if (errorFlag) return;
 
-    std::cout << "Line: " << token.line << " Col: " << token.col << " : " << std::endl;
+    std::cout << "Line: " << token->line << " Col: " << token->col << " : " << std::endl;
     std::cout << "\tExpected Type: " << expected << std::endl;
     std::cout << "\tFound Type: " << actual << std::endl;
     errorFlag = true;
     errorCount++;
 }
 
-void Parser::ReportOpTypeCheckError(std::string op, std::string type1, std::string type2, token_t token)
+void Parser::ReportOpTypeCheckError(std::string op, std::string type1, std::string type2)
 {
-    token = *scanner.PeekToken();
     if (errorFlag) return;
 
-    std::cout << "Line:" << token.line << " Col:" << token.col << " - ";
+    std::cout << "Line:" << token->line << " Col:" << token->col << " - ";
     std::cout << "Incompatible types for " << op << ":" << std::endl;
     std::cout << "Type 1: " << type1 << std::endl;
     std::cout << "Type 2: " << type2 << std::endl << std::endl;
@@ -272,11 +252,10 @@ void Parser::ReportOpTypeCheckError(std::string op, std::string type1, std::stri
     errorCount++;
 }
 
-void Parser::ReportWarning(std::string msg, token_t token)
+void Parser::ReportWarning(std::string msg)
 {
-    token = *scanner.PeekToken();
     if (errorFlag) return;
-    std::cout << "Line:" << token.line << " Col:" << token.col << " : ";
+    std::cout << "Line:" << token->line << " Col:" << token->col << " : ";
     std::cout << "Warning:" << std::endl << msg << std::endl << std::endl;
     warningCount++;
 }
@@ -287,7 +266,7 @@ std::string Parser::Identifier()
 
     if (!ValidateToken(T_IDENTIFIER))
     {
-        ReportError("Identifier expected", *token);
+        ReportError("Identifier expected");
         return std::string();
     }
 
@@ -316,7 +295,7 @@ void Parser::WhileDeclarations()
         {
             if (!ValidateToken(T_SEMICOLON))
             {
-                ReportMissingTokenError(";", *token);
+                ReportMissingTokenError(";");
                 return;
             }
         }
@@ -347,7 +326,7 @@ void Parser::Declaration()
         }
         else
         {
-            ReportError("Error parsing declaration, expected a procedure or variable", *token);
+            ReportError("Error parsing declaration, expected a procedure or variable");
             return;
         }
     }
@@ -364,7 +343,7 @@ void Parser::Declaration()
         }
         else
         {
-            ReportError("Error parsing declaration, expected a procedure or variable", *token);
+            ReportError("Error parsing declaration, expected a procedure or variable");
             return;
         }
     }
@@ -382,7 +361,7 @@ void Parser::VariableDeclaration(Symbol &variable)
 
     if (!ValidateToken(T_COLON))
     {
-        ReportMissingTokenError(":", *token);
+        ReportMissingTokenError(":");
     }
 
     TypeMark(variable);
@@ -395,7 +374,7 @@ void Parser::VariableDeclaration(Symbol &variable)
 
         if (!ValidateToken(T_RBRACKET))
         {
-            ReportMissingTokenError("]", *token);
+            ReportMissingTokenError("]");
             return;
         }
     }
@@ -431,9 +410,16 @@ void Parser::VariableDeclaration(Symbol &variable)
         }
     }
 
+    Symbol globalDuplicate = symbolTable.FindSymbol(variable.GetId());
+    if (variable.IsGlobal() && globalDuplicate.IsValid())
+    {
+        ReportError("Identifier already exists");
+        return;
+    }
+
     if (symbolTable.DoesSymbolExist(variable.GetId()))
     {
-        ReportError("Identifier already exists", *token);
+        ReportError("Identifier already exists");
         return;
     }
 
@@ -448,7 +434,7 @@ void Parser::ProcedureDeclaration(Symbol &procedure) {
     ProcedureHeader(procedure);
 
     std::vector<llvm::Type *> parameters;
-    for (Symbol param : procedure.GetParameters()) {
+    for (const Symbol& param : procedure.GetParameters()) {
         if (param.IsArray()) {
             parameters.push_back(GetLLVMType(param)->getPointerTo());
         } else {
@@ -459,14 +445,14 @@ void Parser::ProcedureDeclaration(Symbol &procedure) {
     llvm::FunctionType *functionType = llvm::FunctionType::get(GetLLVMType(procedure), parameters, false);
     llvm::FunctionCallee procCallee = llvmModule->getOrInsertFunction("proc_" + std::to_string(procedureCount),
                                                                       functionType);
-    llvm::Constant *proc = llvm::dyn_cast<llvm::Constant>(procCallee.getCallee());
+    auto *proc = llvm::dyn_cast<llvm::Constant>(procCallee.getCallee());
     procedureCount++;
-    llvm::Function *func = llvm::cast<llvm::Function>(proc);
+    auto *func = llvm::cast<llvm::Function>(proc);
     func->setCallingConv(llvm::CallingConv::C);
     procedure.SetLLVMFunction(func);
 
     if (symbolTable.DoesSymbolExist(procedure.GetId())) {
-        ReportError("This identifier already exists", *token);
+        ReportError("This identifier already exists");
         return;
     }
 
@@ -478,7 +464,7 @@ void Parser::ProcedureDeclaration(Symbol &procedure) {
     symbolTable.RemoveScope();
 
     if (symbolTable.GetScopeCount() != 0 && symbolTable.DoesSymbolExist(procedure.GetId())) {
-        ReportError("This identifier already exists", *token);
+        ReportError("This identifier already exists");
         return;
     }
 
@@ -496,7 +482,7 @@ void Parser::ProcedureHeader(Symbol &procedure)
 
     if (!ValidateToken(T_COLON))
     {
-        ReportMissingTokenError(":", *token);
+        ReportMissingTokenError(":");
         return;
     }
 
@@ -504,7 +490,7 @@ void Parser::ProcedureHeader(Symbol &procedure)
 
     if (!ValidateToken(T_LPAREN))
     {
-        ReportMissingTokenError("(", *token);
+        ReportMissingTokenError("(");
         return;
     }
 
@@ -512,7 +498,7 @@ void Parser::ProcedureHeader(Symbol &procedure)
 
     if (!ValidateToken(T_RPAREN))
     {
-        ReportMissingTokenError(")", *token);
+        ReportMissingTokenError(")");
         return;
     }
 }
@@ -579,9 +565,9 @@ void Parser::ProcedureBody() {
     }
 
     llvm::Function::arg_iterator args = llvmCurrProc->arg_begin();
-    for (Symbol sym : procSymbol.GetParameters()) {
+    for (const Symbol& sym : procSymbol.GetParameters()) {
         if (args == llvmCurrProc->arg_end()) {
-            ReportError("Could not generator LLVM IR for args", *token);
+            ReportError("Could not generator LLVM IR for args");
             return;
         }
 
@@ -603,7 +589,7 @@ void Parser::ProcedureBody() {
     }
 
     if (token->type != T_BEGIN) {
-        ReportMissingTokenError("BEGIN", *token);
+        ReportMissingTokenError("BEGIN");
         return;
     }
 
@@ -613,11 +599,11 @@ void Parser::ProcedureBody() {
 
     if (!ValidateToken(T_PROCEDURE))
     {
-        ReportMissingTokenError("PROCEDURE", *token);
+        ReportMissingTokenError("PROCEDURE");
         return;
     }
 
-    if (llvmBuilder->GetInsertBlock()->getTerminator() == NULL)
+    if (llvmBuilder->GetInsertBlock()->getTerminator() == nullptr)
     {
         llvm::Constant *retVal = llvm::ConstantInt::getIntegerValue(llvmBuilder->getInt32Ty(), llvm::APInt(32, 0, true));
         llvmBuilder->CreateRet(retVal);
@@ -650,7 +636,7 @@ void Parser::TypeMark(Symbol &symbol)
     }
     else
     {
-        ReportError("Expected int, float, bool, or string type", *token);
+        ReportError("Expected int, float, bool, or string type");
         return;
     }
 
@@ -662,7 +648,7 @@ void Parser::Bound(Symbol &symbol)
 
     if (!ValidateToken(T_INT_LITERAL))
     {
-        ReportMissingTokenError("Integer literal", *token);
+        ReportMissingTokenError("Integer literal");
         return;
     }
 
@@ -698,7 +684,7 @@ void Parser::WhileStatements(int terminators[], int terminatorsSize)
         {
             if (!ValidateToken(T_SEMICOLON))
             {
-                ReportMissingTokenError(";", *token);
+                ReportMissingTokenError(";");
                 return;
             }
         }
@@ -736,7 +722,7 @@ void Parser::Statement() {
     }
     else
     {
-        ReportError("Expected if, for, or return statement", *token);
+        ReportError("Expected if, for, or return statement");
         return;
     }
 
@@ -749,7 +735,7 @@ void Parser::AssignmentStatement()
     Symbol dest = Destination();
     if (!ValidateToken(T_ASSIGNMENT))
     {
-        ReportMissingTokenError(":=", *token);
+        ReportMissingTokenError(":=");
     }
 
     Symbol expr = Expression(dest);
@@ -775,12 +761,12 @@ void Parser::IfStatement()
 
     if (!ValidateToken(T_IF))
     {
-        ReportMissingTokenError("IF", *token);
+        ReportMissingTokenError("IF");
     }
 
     if (!ValidateToken(T_LPAREN))
     {
-        ReportMissingTokenError("(", *token);
+        ReportMissingTokenError("(");
         return;
     }
 
@@ -790,25 +776,25 @@ void Parser::IfStatement()
 
     if (expr.GetType() == T_INTEGER)
     {
-        ReportWarning("Converting integer to boolean", *token);
+        ReportWarning("Converting integer to boolean");
         llvm::Value *val = ConvertIntToBool(expr.GetLLVMValue());
         expr.SetLLVMValue(val);
     }
     else if (expr.GetType() != T_BOOL)
     {
-        ReportError("If statement must evaluate to bool (or int)", *token);
+        ReportError("If statement must evaluate to bool (or int)");
         return;
     }
 
     if (!ValidateToken(T_RPAREN))
     {
-        ReportMissingTokenError(")", *token);
+        ReportMissingTokenError(")");
         return;
     }
 
     if (!ValidateToken(T_THEN))
     {
-        ReportMissingTokenError("THEN", *token);
+        ReportMissingTokenError("THEN");
         return;
     }
 
@@ -831,39 +817,33 @@ void Parser::IfStatement()
     {
         end = llvm::BasicBlock::Create(llvmContext, "", llvmCurrProc);
 
-        if (llvmBuilder->GetInsertBlock()->getTerminator() == NULL)
+        if (llvmBuilder->GetInsertBlock()->getTerminator() == nullptr)
         {
             llvmBuilder->CreateBr(end);
         }
 
         llvmBuilder->SetInsertPoint(false_);
 
-        // TODO: need to fix this, tokens are getting out of sync somewhere
         int endElse[] = {T_END};
         terminatorSize = 1;
         WhileStatements(endElse, terminatorSize);
     }
 
-//    // TODO: need to fix this, tokens are getting out of sync somewhere
-//    int endElse[] = {T_END};
-//    terminatorSize = 1;
-//    WhileStatements(endElse, terminatorSize);
-
     if (token->type != T_END)
     {
-        ReportMissingTokenError("END", *token);
+        ReportMissingTokenError("END");
         return;
     }
 
     if (!ValidateToken(T_IF))
     {
-        ReportMissingTokenError("IF", *token);
+        ReportMissingTokenError("IF");
         return;
     }
 
     if (end == nullptr)
     {
-        if (llvmBuilder->GetInsertBlock()->getTerminator() == NULL)
+        if (llvmBuilder->GetInsertBlock()->getTerminator() == nullptr)
         {
             llvmBuilder->CreateBr(false_);
         }
@@ -872,7 +852,7 @@ void Parser::IfStatement()
     }
     else
     {
-        if (llvmBuilder->GetInsertBlock()->getTerminator() == NULL)
+        if (llvmBuilder->GetInsertBlock()->getTerminator() == nullptr)
         {
             llvmBuilder->CreateBr(end);
         }
@@ -887,13 +867,13 @@ void Parser::LoopStatement()
 
     if (!ValidateToken(T_FOR))
     {
-        ReportMissingTokenError("FOR", *token);
+        ReportMissingTokenError("FOR");
         return;
     }
 
     if (!ValidateToken(T_LPAREN))
     {
-        ReportMissingTokenError("(", *token);
+        ReportMissingTokenError("(");
         return;
     }
 
@@ -901,7 +881,7 @@ void Parser::LoopStatement()
 
     if (!ValidateToken(T_SEMICOLON))
     {
-        ReportMissingTokenError(";", *token);
+        ReportMissingTokenError(";");
         return;
     }
 
@@ -922,19 +902,19 @@ void Parser::LoopStatement()
 
     if (expr.GetType() == T_INTEGER)
     {
-        ReportWarning("Converting integer to boolean", *token);
+        ReportWarning("Converting integer to boolean");
         llvm::Value *val = ConvertIntToBool(expr.GetLLVMValue());
         expr.SetLLVMValue(val);
     }
     else if (expr.GetType() != T_BOOL)
     {
-        ReportError("Condition in loop must evaluate to bool (or int)", *token);
+        ReportError("Condition in loop must evaluate to bool (or int)");
         return;
     }
 
     if (!ValidateToken(T_RPAREN))
     {
-        ReportMissingTokenError(")", *token);
+        ReportMissingTokenError(")");
         return;
     }
 
@@ -947,13 +927,13 @@ void Parser::LoopStatement()
 
     if (token->type != T_END)
     {
-        ReportMissingTokenError("END", *token);
+        ReportMissingTokenError("END");
         return;
     }
 
     if (!ValidateToken(T_FOR))
     {
-        ReportMissingTokenError("FOR", *token);
+        ReportMissingTokenError("FOR");
         return;
     }
 
@@ -967,14 +947,14 @@ void Parser::ReturnStatement()
 
     if (!ValidateToken(T_RETURN))
     {
-        ReportMissingTokenError("RETURN", *token);
+        ReportMissingTokenError("RETURN");
         return;
     }
 
     // TODO: not sure if this is ok. Doing it since if you return from the "main" scope it should just get swallowed
     Symbol proc = symbolTable.GetScopeProc();
     if (!proc.IsValid()) {
-        ReportWarning("Cannot return from this scope", *token);
+        ReportWarning("Cannot return from this scope");
         llvm::Constant *retVal = llvm::ConstantInt::getIntegerValue(llvmBuilder->getInt32Ty(), llvm::APInt(32, 0, true));
         llvmBuilder->CreateRet(retVal);
         return;
@@ -996,7 +976,7 @@ Symbol Parser::IndexArray(Symbol symbol)
     Symbol sym = Symbol();
     if (ValidateToken(T_LBRACKET))
     {
-        ReportMissingTokenError("[", *token);
+        ReportMissingTokenError("[");
 
         sym.SetIsValid(false);
         return sym;
@@ -1008,21 +988,21 @@ Symbol Parser::IndexArray(Symbol symbol)
 
     if (idx.GetType() != T_INTEGER)
     {
-        ReportError("Array index must be an integer.", *token);
+        ReportError("Array index must be an integer.");
         symbol.SetIsValid(false);
         return symbol;
     }
 
     if (!symbol.IsArray())
     {
-        ReportError("Indexing not supported for non-arrays", *token);
+        ReportError("Indexing not supported for non-arrays");
         symbol.SetIsValid(false);
         return symbol;
     }
 
     if (!ValidateToken(T_RBRACKET))
     {
-        ReportMissingTokenError("]", *token);
+        ReportMissingTokenError("]");
         symbol.SetIsValid(false);
         return symbol;
     }
@@ -1068,7 +1048,7 @@ Symbol Parser::AssignmentTypeCheck(Symbol dest, Symbol expr, token_t *token)
         {
             isDiff = false;
             expr.SetType(T_BOOL);
-            ReportWarning("Converting int to bool", *token);
+            ReportWarning("Converting int to bool");
             llvm::Value *val = ConvertIntToBool(expr.GetLLVMValue());
             expr.SetLLVMValue(val);
         }
@@ -1079,7 +1059,7 @@ Symbol Parser::AssignmentTypeCheck(Symbol dest, Symbol expr, token_t *token)
             {
                 expr.SetType(T_INTEGER);
                 isDiff = false;
-                ReportWarning("Converting bool to int", *token);
+                ReportWarning("Converting bool to int");
                 llvm::Value *val = llvmBuilder->CreateZExtOrTrunc(expr.GetLLVMValue(), llvmBuilder->getInt32Ty());
                 expr.SetLLVMValue(val);
             }
@@ -1087,7 +1067,7 @@ Symbol Parser::AssignmentTypeCheck(Symbol dest, Symbol expr, token_t *token)
             {
                 expr.SetType(T_INTEGER);
                 isDiff = false;
-                ReportWarning("Converting float to int", *token);
+                ReportWarning("Converting float to int");
                 llvm::Value *val = llvmBuilder->CreateFPToSI(expr.GetLLVMValue(), llvmBuilder->getInt32Ty());
                 expr.SetLLVMValue(val);
             }
@@ -1096,7 +1076,7 @@ Symbol Parser::AssignmentTypeCheck(Symbol dest, Symbol expr, token_t *token)
         if (dest.GetType() == T_FLOAT && expr.GetType() == T_INTEGER)
         {
             isDiff = false;
-            ReportWarning("Converting int to float", *token);
+            ReportWarning("Converting int to float");
             expr.SetType(T_FLOAT);
             llvm::Value *val = llvmBuilder->CreateSIToFP(expr.GetLLVMValue(), llvmBuilder->getFloatTy());
             expr.SetLLVMValue(val);
@@ -1105,7 +1085,7 @@ Symbol Parser::AssignmentTypeCheck(Symbol dest, Symbol expr, token_t *token)
 
         if (isDiff)
         {
-            ReportTypeMismatchError(TypeToString(dest.GetType()), TypeToString(expr.GetType()), *token);
+            ReportTypeMismatchError(TypeToString(dest.GetType()), TypeToString(expr.GetType()));
             expr.SetIsValid(false);
             return expr;
         }
@@ -1123,13 +1103,13 @@ Symbol Parser::Destination()
 
     if (!dest.IsValid())
     {
-        ReportError("Symbol: " + id + " not found", *token);
+        ReportError("Symbol: " + id + " not found");
         return dest;
     }
 
     if (dest.GetDeclarationType() != T_VARIABLE)
     {
-        ReportError("Variable required for valid destination", *token);
+        ReportError("Variable required for valid destination");
         dest = Symbol();
         dest.SetIsValid(false);
         return dest;
@@ -1203,7 +1183,8 @@ Symbol Parser::ExpressionTypeCheck(Symbol expectedType, Symbol arithOp, Symbol e
         }
         else
         {
-            ReportError("Invalid type", *op);
+//            ReportError("Invalid type", *op);
+            ReportError("Invalid type");
             sym.SetIsValid(false);
 
             return sym;
@@ -1211,7 +1192,7 @@ Symbol Parser::ExpressionTypeCheck(Symbol expectedType, Symbol arithOp, Symbol e
 
         if (!isInterop)
         {
-            ReportOpTypeCheckError(opStr, TypeToString(arithOp.GetType()), TypeToString(exprTail.GetType()), *op);
+            ReportOpTypeCheckError(opStr, TypeToString(arithOp.GetType()), TypeToString(exprTail.GetType()));
             sym.SetIsValid(false);
 
             return sym;
@@ -1227,7 +1208,7 @@ Symbol Parser::ExpressionTypeCheck(Symbol expectedType, Symbol arithOp, Symbol e
                 val = llvmBuilder->CreateOr(arithOp.GetLLVMValue(), exprTail.GetLLVMValue());
                 break;
             default:
-                std::cout << "error in codegen for operation" << std::endl;
+                std::cout << "error in codegen for operation" << std::endl; // TODO: fix msg
         }
 
         sym.SetLLVMValue(val);
@@ -1256,7 +1237,7 @@ Symbol Parser::ExpressionTypeCheck(Symbol expectedType, Symbol arithOp, Symbol e
 
             if (!isInterop)
             {
-                ReportOpTypeCheckError("binary", TypeToString(arithOp.GetType()), "null", *op);
+                ReportOpTypeCheckError("binary", TypeToString(arithOp.GetType()), "null");
 
                 Symbol sym = Symbol();
                 sym.SetIsValid(false);
@@ -1331,7 +1312,7 @@ Symbol Parser::ArithOpTypeCheck(Symbol expectedType, Symbol rel, Symbol tail, to
 
         if (!isInterop)
         {
-            ReportOpTypeCheckError("arith", TypeToString(rel.GetType()), TypeToString(tail.GetType()), *op);
+            ReportOpTypeCheckError("arith", TypeToString(rel.GetType()), TypeToString(tail.GetType()));
             sym.SetIsValid(false);
 
             return sym;
@@ -1383,7 +1364,7 @@ Symbol Parser::ArithOpTypeCheck(Symbol expectedType, Symbol rel, Symbol tail, to
                 }
                 break;
             default:
-                std::cout << "Error finding operation" << std::endl;
+                std::cout << "Error finding operation" << std::endl; // todo: fix msg
         }
 
         sym.SetLLVMValue(val);
@@ -1514,7 +1495,7 @@ Symbol Parser::RelationTypeCheck(Symbol expectedType, Symbol term, Symbol relTai
 
         if (!isInterop)
         {
-            ReportOpTypeCheckError("relational", TypeToString(term.GetType()), TypeToString(relTail.GetType()), *op);
+            ReportOpTypeCheckError("relational", TypeToString(term.GetType()), TypeToString(relTail.GetType()));
             sym.SetIsValid(false);
             return sym;
         }
@@ -1625,7 +1606,7 @@ Symbol Parser::RelationTypeCheck(Symbol expectedType, Symbol term, Symbol relTai
                     }
                     break;
                 default:
-                    std::cout << "Operation error in codegen" << std::endl;
+                    std::cout << "Operation error in codegen" << std::endl; // todo: fix msg
             }
         }
 
@@ -1680,7 +1661,7 @@ Symbol Parser::Factor(Symbol expectedType)
         sym = Expression(expectedType);
         if (!ValidateToken(T_RPAREN))
         {
-            ReportMissingTokenError(")", *token);
+            ReportMissingTokenError(")");
             sym.SetIsValid(false);
             return sym;
         }
@@ -1701,7 +1682,7 @@ Symbol Parser::Factor(Symbol expectedType)
         }
         else
         {
-            ReportError("Expected an identifier or number literal", *token);
+            ReportError("Expected an identifier or number literal");
             sym.SetIsValid(false);
             return sym;
         }
@@ -1718,7 +1699,7 @@ Symbol Parser::Factor(Symbol expectedType)
         }
         else
         {
-            ReportTypeMismatchError("int/float", TypeToString(sym.GetType()), *token);
+            ReportTypeMismatchError("int/float", TypeToString(sym.GetType()));
         }
 
 
@@ -1745,7 +1726,7 @@ Symbol Parser::Factor(Symbol expectedType)
     }
     else
     {
-        ReportError("Factor expected", *token);
+        ReportError("Factor expected");
         sym.SetIsValid(false);
         return sym;
     }
@@ -1763,7 +1744,7 @@ Symbol Parser::ProcedureCallOrName()
 
     if (!sym.IsValid())
     {
-        ReportError("Symbol not found: " + id, *token);
+        ReportError("Symbol not found: " + id);
         return sym;
     }
 
@@ -1772,7 +1753,7 @@ Symbol Parser::ProcedureCallOrName()
         // procedure
         if (sym.GetDeclarationType() != T_PROCEDURE)
         {
-            ReportError("Cannot call non procedure type", *token);
+            ReportError("Cannot call non procedure type");
             sym = Symbol();
             sym.SetIsValid(false);
 
@@ -1796,9 +1777,9 @@ Symbol Parser::ProcedureCallOrName()
         }
         else
         {
-            if (procSym.GetParameters().size() != 0)
+            if (!procSym.GetParameters().empty())
             {
-                ReportError("Missing arguments for procedure", *token);
+                ReportError("Missing arguments for procedure");
                 sym.SetIsValid(false);
 
                 return sym;
@@ -1810,7 +1791,7 @@ Symbol Parser::ProcedureCallOrName()
 
         if (!ValidateToken(T_RPAREN))
         {
-            ReportMissingTokenError(")", *token);
+            ReportMissingTokenError(")");
             sym.SetIsValid(false);
             return sym;
         }
@@ -1820,7 +1801,7 @@ Symbol Parser::ProcedureCallOrName()
         // name
         if (sym.GetDeclarationType() != T_VARIABLE)
         {
-            ReportError("Name must be a variable", *token);
+            ReportError("Name must be a variable");
             sym.SetIsValid(false);
 
             return sym;
@@ -1830,7 +1811,7 @@ Symbol Parser::ProcedureCallOrName()
         {
             if (sym.GetDeclarationType() != T_VARIABLE)
             {
-                ReportError("Indexing is not supported for non-arrays.", *token);
+                ReportError("Indexing is not supported for non-arrays.");
                 sym = Symbol();
                 sym.SetIsValid(false);
                 return sym;
@@ -1851,7 +1832,7 @@ Symbol Parser::ProcedureCallOrName()
         {
             if (sym.IsInitialized() == false)
             {
-                ReportError("Variable has not yet been initialized", *token);
+                ReportError("Variable has not yet been initialized");
                 sym.SetIsValid(false);
 
                 return sym;
@@ -1901,7 +1882,7 @@ Symbol Parser::String()
     Symbol sym = Symbol();
     if (token->type != T_STRING_LITERAL)
     {
-        ReportError("String literal expected.", *token);
+        ReportError("String literal expected.");
         return sym;
     }
 
@@ -1921,7 +1902,7 @@ std::vector<llvm::Value *> Parser::ArgumentList(std::vector<Symbol>::iterator cu
     do {
         if (curr == end)
         {
-            ReportError("Too many arguments", *token);
+            ReportError("Too many arguments");
             return arguments;
         }
 
@@ -1932,13 +1913,13 @@ std::vector<llvm::Value *> Parser::ArgumentList(std::vector<Symbol>::iterator cu
         {
             if (curr->GetArraySize() != expr.GetArraySize() || expr.IsArrayIndexed())
             {
-                ReportError("Array expected as argument", *token);
+                ReportError("Array expected as argument");
                 return arguments;
             }
         }
         else if (expr.IsArray() && !expr.IsArrayIndexed())
         {
-            ReportError("Invalid argument: array not expected", *token);
+            ReportError("Invalid argument: array not expected");
             return arguments;
         }
 
@@ -1978,7 +1959,7 @@ std::vector<llvm::Value *> Parser::ArgumentList(std::vector<Symbol>::iterator cu
             {
                 if (std::next(curr) != end)
                 {
-                    ReportError("Not enough arguments", *token);
+                    ReportError("Not enough arguments");
                     return arguments;
                 }
             }

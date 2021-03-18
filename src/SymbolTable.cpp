@@ -36,8 +36,8 @@ void SymbolTable::RemoveScope() {
 
 void SymbolTable::AddSymbol(Symbol &symbol) {
     // Debug only
-    std::cout << "\tInserting symbol: ";
-    symbol.PrintDebugInfo();
+    //std::cout << "\tInserting symbol: ";
+    //symbol.PrintDebugInfo();
 
     if (symbol.IsGlobal())
     {
@@ -75,8 +75,6 @@ bool SymbolTable::DoesSymbolExist(std::string id) {
     }
     else if (scopeCount != 0)
     {
-        // This might solve the issue of variables that were prefixed with the global keyword not being able
-        // to be redefined in a local scope
         return false;
     }
 
@@ -99,8 +97,8 @@ Symbol SymbolTable::FindSymbol(std::string id) {
     if (it != localScopes.back().end())
     {
         // Debug
-        std::cout << "Found the following symbol:" << std::endl;
-        it->second.PrintDebugInfo();
+        //std::cout << "Found the following symbol:" << std::endl;
+        //it->second.PrintDebugInfo();
 
         return it->second;
     }

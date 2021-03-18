@@ -50,12 +50,12 @@ private:
 
     void PrintDebugInfo(std::string langID);
 
-    void ReportError(std::string msg, token_t token);
-    void ReportMissingTokenError(std::string expected, token_t token);
-    void ReportTypeMismatchError(std::string expected, std::string actual, token_t token);
-    void ReportOpTypeCheckError(std::string op, std::string type1, std::string type2, token_t token);
+    void ReportError(std::string msg);
+    void ReportMissingTokenError(std::string expected);
+    void ReportTypeMismatchError(std::string expected, std::string actual);
+    void ReportOpTypeCheckError(std::string op, std::string type1, std::string type2);
 
-    void ReportWarning(std::string msg, token_t token);
+    void ReportWarning(std::string msg);
 
     void Resync(token_t tokens[], int length);
 

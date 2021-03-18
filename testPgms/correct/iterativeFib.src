@@ -7,7 +7,7 @@ variable tmp : integer;
 variable out : bool;
 
 procedure Fib : integer(variable val : integer)
-	variable tmp : integer[2]; // change to float
+	variable tmp :integer[2]; // change to float
 	variable loopVal : integer;
     variable ret : integer;
 
@@ -29,10 +29,10 @@ end procedure;
 
 begin
 
-max := 12; //getInteger();
+max := getInteger();
 for(i := 0; i < max)
 	x := Fib(i);
-	//out := putInteger(x);
+	out := putInteger(x);
 	i := i + 1;
 end for;
 
