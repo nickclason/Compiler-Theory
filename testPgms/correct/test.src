@@ -1,0 +1,7 @@
+program test_program is
+    variable a : integer;
+
+begin
+    a := 3;
+    return 1.00000; // returns get ignored and replaced by default return, i32 0
+end program .

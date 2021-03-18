@@ -90,19 +90,19 @@ private:
     Symbol Destination();
 
     Symbol Expression(Symbol expectedType);
-    Symbol ExpressionTail(Symbol expectedType);
-    Symbol ExpressionTypeCheck(Symbol expectedType, Symbol arithOp, Symbol exprTail, token_t *op, bool isNotOp);
+    Symbol Expression_(Symbol expectedType);
+    Symbol ExpressionTypeCheck(Symbol expectedType, Symbol arithOp, Symbol expr_, token_t *op, bool isNotOp);
 
     Symbol ArithOp(Symbol expectedType);
-    Symbol ArithOpTail(Symbol expectedType);
-    Symbol ArithOpTypeCheck(Symbol expectedType, Symbol rel, Symbol tail, token_t *op);
+    Symbol ArithOp_(Symbol expectedType);
+    Symbol ArithOpTypeCheck(Symbol expectedType, Symbol rel, Symbol arithOp_, token_t *op);
 
     Symbol Relation(Symbol expectedType);
-    Symbol RelationTail(Symbol expectedType);
-    Symbol RelationTypeCheck(Symbol expectedType, Symbol term, Symbol relTail, token_t *op);
+    Symbol Relation_(Symbol expectedType);
+    Symbol RelationTypeCheck(Symbol expectedType, Symbol term, Symbol relation_, token_t *op);
 
     Symbol Term(Symbol expectedType);
-    Symbol TermTail(Symbol expectedType);
+    Symbol Term_(Symbol expectedType);
 
     Symbol Factor(Symbol expectedType);
     Symbol Number();

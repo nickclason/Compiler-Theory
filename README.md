@@ -5,3 +5,9 @@ Compiler for EECE 5183/6083
 ```
 make all 
 ```
+
+## How to run
+```
+./output/compiler
+clang output/IR.ll src/runtime.c
+```

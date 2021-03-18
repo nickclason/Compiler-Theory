@@ -6,10 +6,15 @@
 
 #include <fstream>
 
+#include "llvm/IR/LegacyPassManager.h"
+#include "llvm/IR/Verifier.h"
 #include "llvm/Support/FileSystem.h"
 #include "llvm/Support/raw_ostream.h"
-
-// TODO: CreateFAdd/Sub/Cmp/etc change "" to addtmp, multmp, subtmp, etc
+#include "llvm/Support/Host.h"
+#include "llvm/Support/TargetRegistry.h"
+#include "llvm/Support/TargetSelect.h"
+#include "llvm/Target/TargetMachine.h"
+#include "llvm/Target/TargetOptions.h"
 
 Parser::Parser(std::string fileName, bool debug_, Scanner scanner_, SymbolTable symbolTable_, token_t *token_)
 {
@@ -30,10 +35,10 @@ Parser::Parser(std::string fileName, bool debug_, Scanner scanner_, SymbolTable 
     llvmCurrProc = nullptr;
 
     Program();
-    if (debug)
-    {
-        //llvmModule->print(llvm::errs(), nullptr);
-
+//    if (debug)
+//    {
+//        llvmModule->print(llvm::errs(), nullptr);
+//
 //        fileName.erase(fileName.begin(), fileName.begin()+57);
 //
 //        fileName.erase(fileName.end()-4, fileName.end());
@@ -41,20 +46,74 @@ Parser::Parser(std::string fileName, bool debug_, Scanner scanner_, SymbolTable 
 //        std::error_code error_code;
 //        llvm::raw_fd_ostream out(outFile, error_code, llvm::sys::fs::F_None);
 //        llvmModule->print(out, nullptr);
-    }
+//    }
+
+
 
 
     if (!errorFlag && errorCount == 0)
     {
         std::cout << "Parse was successful." << std::endl;
 
-        fileName.erase(fileName.begin(), fileName.begin()+55);
-
-        fileName.erase(fileName.end()-4, fileName.end());
-        std::string outFile = "/Users/nick/Documents/Compiler-Theory/out/" + fileName + ".ll";
+        std::string outFile = "/Users/nick/Documents/Compiler-Theory/output/IR.ll";
         std::error_code error_code;
         llvm::raw_fd_ostream out(outFile, error_code, llvm::sys::fs::F_None);
         llvmModule->print(out, nullptr);
+
+
+        // These steps are from the llvm Kaleidoscope tutorial
+        bool isVerified = llvm::verifyModule(*llvmModule, &llvm::errs());
+        //printf("PRE-VERIFICATION");
+//        if (!isVerified) { llvmModule->print(llvm::errs(), nullptr); return; }
+        //printf("VERIFIED");
+        auto TargetTriple = llvm::sys::getDefaultTargetTriple();
+
+        llvm::InitializeAllTargetInfos();
+        llvm::InitializeAllTargets();
+        llvm::InitializeAllTargetMCs();
+        llvm::InitializeAllAsmParsers();
+        llvm::InitializeAllAsmPrinters();
+
+        std::string Error;
+        auto Target = llvm::TargetRegistry::lookupTarget(TargetTriple, Error);
+
+
+        if (!Target) {
+            llvm::errs() << Error;
+            return;
+        }
+
+        //printf("TARGET");
+
+        auto CPU = "generic";
+        auto Features = "";
+
+        llvm::TargetOptions opt;
+        auto RM = llvm::Optional<llvm::Reloc::Model>();
+        auto TargetMachine = Target->createTargetMachine(TargetTriple, CPU, Features, opt, RM);
+
+        llvmModule->setDataLayout(TargetMachine->createDataLayout());
+        llvmModule->setTargetTriple(TargetTriple);
+
+        auto Filename = "/Users/nick/Documents/Compiler-Theory/output/output.o";
+        std::error_code EC;
+        llvm::raw_fd_ostream dest(Filename, EC, llvm::sys::fs::OF_None);
+
+        if (EC) {
+            llvm::errs() << "Could not open file: " << EC.message();
+            return;
+        }
+
+        llvm::legacy::PassManager pass;
+        auto FileType = llvm::CGFT_ObjectFile;
+
+        if (TargetMachine->addPassesToEmitFile(pass, dest, nullptr, FileType)) {
+            llvm::errs() << "TargetMachine can't emit a file of this type";
+            return;
+        }
+
+        pass.run(*llvmModule);
+        dest.flush();
     }
 }
 
@@ -82,7 +141,6 @@ void Parser::ProgramHeader()
     llvmModule = new llvm::Module(id, llvmContext);
     llvmBuilder = new llvm::IRBuilder<>(llvmContext);
 
-    // TODO: insert runtime functions
     symbolTable.AddIOFunctions(llvmModule, llvmContext, llvmBuilder);
 
     if (!ValidateToken(T_IS))
@@ -951,12 +1009,14 @@ void Parser::ReturnStatement()
         return;
     }
 
-    // TODO: not sure if this is ok. Doing it since if you return from the "main" scope it should just get swallowed
+    // Currently if there is any return statement in the "main" program scope, it just gets ignored and
+    // replaced with the default return value, 0.
     Symbol proc = symbolTable.GetScopeProc();
     if (!proc.IsValid()) {
-        ReportWarning("Cannot return from this scope");
+        ReportWarning("Return statements in this scope are ignored");
         llvm::Constant *retVal = llvm::ConstantInt::getIntegerValue(llvmBuilder->getInt32Ty(), llvm::APInt(32, 0, true));
         llvmBuilder->CreateRet(retVal);
+        Symbol expr = Expression(proc);
         return;
     }
 
@@ -1018,7 +1078,7 @@ Symbol Parser::IndexArray(Symbol symbol)
     llvmBuilder->CreateCondBr(actualIdx, succ, fail);
     llvmBuilder->SetInsertPoint(fail);
 
-    // TODO: Need to somehow call a function to quit runniong if there is an index error?
+    // TODO: Need to somehow call a function to quit running if there is an index error?
 
     llvmBuilder->CreateBr(succ);
     llvmBuilder->SetInsertPoint(succ);
@@ -1137,12 +1197,12 @@ Symbol Parser::Expression(Symbol expectedType)
 
     Symbol arithOp = ArithOp(expectedType);
     token_t *op = scanner.PeekToken();
-    Symbol exprTail = ExpressionTail(expectedType);
+    Symbol expr_ = Expression_(expectedType);
 
-    return ExpressionTypeCheck(expectedType, arithOp, exprTail, op, isNotOp);
+    return ExpressionTypeCheck(expectedType, arithOp, expr_, op, isNotOp);
 }
 
-Symbol Parser::ExpressionTail(Symbol expectedType)
+Symbol Parser::Expression_(Symbol expectedType)
 {
     PrintDebugInfo("<expression_tail>");
 
@@ -1150,9 +1210,9 @@ Symbol Parser::ExpressionTail(Symbol expectedType)
     {
         Symbol arithOp = ArithOp(expectedType);
         token_t *op = scanner.PeekToken();
-        Symbol exprTail = ExpressionTail(expectedType);
+        Symbol expr_ = Expression_(expectedType);
 
-        return ExpressionTypeCheck(expectedType, arithOp, exprTail, op, false);
+        return ExpressionTypeCheck(expectedType, arithOp, expr_, op, false);
     }
 
     Symbol sym = Symbol();
@@ -1161,9 +1221,9 @@ Symbol Parser::ExpressionTail(Symbol expectedType)
     return sym;
 }
 
-Symbol Parser::ExpressionTypeCheck(Symbol expectedType, Symbol arithOp, Symbol exprTail, token_t *op, bool isNotOp)
+Symbol Parser::ExpressionTypeCheck(Symbol expectedType, Symbol arithOp, Symbol expr_, token_t *op, bool isNotOp)
 {
-    if (exprTail.IsValid())
+    if (expr_.IsValid())
     {
         Symbol sym = Symbol();
         bool isInterop = false;
@@ -1172,18 +1232,17 @@ Symbol Parser::ExpressionTypeCheck(Symbol expectedType, Symbol arithOp, Symbol e
         if (expectedType.GetType() == T_BOOL)
         {
             opStr = "logical";
-            isInterop = (arithOp.GetType() == T_BOOL && exprTail.GetType() == T_BOOL);
+            isInterop = (arithOp.GetType() == T_BOOL && expr_.GetType() == T_BOOL);
             sym.SetType(T_BOOL);
         }
         else if (expectedType.GetType() == T_INTEGER || expectedType.GetType() == T_FLOAT)
         {
-            isInterop = (arithOp.GetType() == T_INTEGER && exprTail.GetType() == T_INTEGER);
+            isInterop = (arithOp.GetType() == T_INTEGER && expr_.GetType() == T_INTEGER);
             opStr = "binary";
             sym.SetType(T_INTEGER);
         }
         else
         {
-//            ReportError("Invalid type", *op);
             ReportError("Invalid type");
             sym.SetIsValid(false);
 
@@ -1192,7 +1251,7 @@ Symbol Parser::ExpressionTypeCheck(Symbol expectedType, Symbol arithOp, Symbol e
 
         if (!isInterop)
         {
-            ReportOpTypeCheckError(opStr, TypeToString(arithOp.GetType()), TypeToString(exprTail.GetType()));
+            ReportOpTypeCheckError(opStr, TypeToString(arithOp.GetType()), TypeToString(expr_.GetType()));
             sym.SetIsValid(false);
 
             return sym;
@@ -1202,10 +1261,10 @@ Symbol Parser::ExpressionTypeCheck(Symbol expectedType, Symbol arithOp, Symbol e
         switch (op->type)
         {
             case T_AND:
-                val = llvmBuilder->CreateAnd(arithOp.GetLLVMValue(), exprTail.GetLLVMValue());
+                val = llvmBuilder->CreateAnd(arithOp.GetLLVMValue(), expr_.GetLLVMValue());
                 break;
             case T_OR:
-                val = llvmBuilder->CreateOr(arithOp.GetLLVMValue(), exprTail.GetLLVMValue());
+                val = llvmBuilder->CreateOr(arithOp.GetLLVMValue(), expr_.GetLLVMValue());
                 break;
             default:
                 std::cout << "error in codegen for operation" << std::endl; // TODO: fix msg
@@ -1259,12 +1318,12 @@ Symbol Parser::ArithOp(Symbol expectedType)
 
     Symbol rel = Relation(expectedType);
     token_t *op = scanner.PeekToken();
-    Symbol arithOpTail = ArithOpTail(expectedType);
+    Symbol arithOp_ = ArithOp_(expectedType);
 
-    return ArithOpTypeCheck(expectedType, rel, arithOpTail, op);
+    return ArithOpTypeCheck(expectedType, rel, arithOp_, op);
 }
 
-Symbol Parser::ArithOpTail(Symbol expectedType)
+Symbol Parser::ArithOp_(Symbol expectedType)
 {
     PrintDebugInfo("<arithOp_tail>");
 
@@ -1272,9 +1331,9 @@ Symbol Parser::ArithOpTail(Symbol expectedType)
     {
         Symbol rel = Relation(expectedType);
         token_t *op = scanner.PeekToken();
-        Symbol arithOpTail = ArithOpTail(expectedType);
+        Symbol arithOp_ = ArithOp_(expectedType);
 
-        return ArithOpTypeCheck(expectedType, rel, arithOpTail, op);
+        return ArithOpTypeCheck(expectedType, rel, arithOp_, op);
     }
 
     Symbol sym = Symbol();
@@ -1283,16 +1342,16 @@ Symbol Parser::ArithOpTail(Symbol expectedType)
     return sym;
 }
 
-Symbol Parser::ArithOpTypeCheck(Symbol expectedType, Symbol rel, Symbol tail, token_t *op)
+Symbol Parser::ArithOpTypeCheck(Symbol expectedType, Symbol rel, Symbol arithOp_, token_t *op)
 {
-    if (tail.IsValid())
+    if (arithOp_.IsValid())
     {
         Symbol sym = Symbol();
         bool isInterop = false;
         if (rel.GetType() == T_INTEGER)
         {
-            isInterop = (tail.GetType() == T_INTEGER || tail.GetType() == T_FLOAT);
-            if (isInterop && tail.GetType() == T_FLOAT)
+            isInterop = (arithOp_.GetType() == T_INTEGER || arithOp_.GetType() == T_FLOAT);
+            if (isInterop && arithOp_.GetType() == T_FLOAT)
             {
                 // do type conversion
                 llvm::Value *val = llvmBuilder->CreateSIToFP(rel.GetLLVMValue(), llvmBuilder->getFloatTy());
@@ -1302,23 +1361,23 @@ Symbol Parser::ArithOpTypeCheck(Symbol expectedType, Symbol rel, Symbol tail, to
         }
         else if (rel.GetType() == T_FLOAT)
         {
-            isInterop = (tail.GetType() == T_INTEGER || tail.GetType() == T_FLOAT);
-            if (isInterop && tail.GetType() == T_INTEGER)
+            isInterop = (arithOp_.GetType() == T_INTEGER || arithOp_.GetType() == T_FLOAT);
+            if (isInterop && arithOp_.GetType() == T_INTEGER)
             {
-                llvm::Value *val = llvmBuilder->CreateSIToFP(tail.GetLLVMValue(), llvmBuilder->getFloatTy());
-                tail.SetLLVMValue(val);
+                llvm::Value *val = llvmBuilder->CreateSIToFP(arithOp_.GetLLVMValue(), llvmBuilder->getFloatTy());
+                arithOp_.SetLLVMValue(val);
             }
         }
 
         if (!isInterop)
         {
-            ReportOpTypeCheckError("arith", TypeToString(rel.GetType()), TypeToString(tail.GetType()));
+            ReportOpTypeCheckError("arith", TypeToString(rel.GetType()), TypeToString(arithOp_.GetType()));
             sym.SetIsValid(false);
 
             return sym;
         }
 
-        bool isFloatOp = (rel.GetType() == T_FLOAT || tail.GetType() == T_FLOAT);
+        bool isFloatOp = (rel.GetType() == T_FLOAT || arithOp_.GetType() == T_FLOAT);
 
         llvm::Value *val;
         switch (op->type)
@@ -1326,41 +1385,41 @@ Symbol Parser::ArithOpTypeCheck(Symbol expectedType, Symbol rel, Symbol tail, to
             case T_ADD:
                 if (isFloatOp)
                 {
-                    val = llvmBuilder->CreateBinOp(llvm::Instruction::FAdd, rel.GetLLVMValue(), tail.GetLLVMValue());
+                    val = llvmBuilder->CreateBinOp(llvm::Instruction::FAdd, rel.GetLLVMValue(), arithOp_.GetLLVMValue());
                 }
                 else
                 {
-                    val = llvmBuilder->CreateBinOp(llvm::Instruction::Add, rel.GetLLVMValue(), tail.GetLLVMValue());
+                    val = llvmBuilder->CreateBinOp(llvm::Instruction::Add, rel.GetLLVMValue(), arithOp_.GetLLVMValue());
                 }
                 break;
             case T_SUBTRACT:
                 if (isFloatOp)
                 {
-                    val = llvmBuilder->CreateBinOp(llvm::Instruction::FSub, rel.GetLLVMValue(), tail.GetLLVMValue());
+                    val = llvmBuilder->CreateBinOp(llvm::Instruction::FSub, rel.GetLLVMValue(), arithOp_.GetLLVMValue());
                 }
                 else
                 {
-                    val = llvmBuilder->CreateBinOp(llvm::Instruction::Sub, rel.GetLLVMValue(), tail.GetLLVMValue());
+                    val = llvmBuilder->CreateBinOp(llvm::Instruction::Sub, rel.GetLLVMValue(), arithOp_.GetLLVMValue());
                 }
                 break;
             case T_MULTIPLY:
                 if (isFloatOp)
                 {
-                    val = llvmBuilder->CreateBinOp(llvm::Instruction::FMul, rel.GetLLVMValue(), tail.GetLLVMValue());
+                    val = llvmBuilder->CreateBinOp(llvm::Instruction::FMul, rel.GetLLVMValue(), arithOp_.GetLLVMValue());
                 }
                 else
                 {
-                    val = llvmBuilder->CreateBinOp(llvm::Instruction::Mul, rel.GetLLVMValue(), tail.GetLLVMValue());
+                    val = llvmBuilder->CreateBinOp(llvm::Instruction::Mul, rel.GetLLVMValue(), arithOp_.GetLLVMValue());
                 }
                 break;
             case T_DIVIDE:
                 if (isFloatOp)
                 {
-                    val = llvmBuilder->CreateBinOp(llvm::Instruction::FDiv, rel.GetLLVMValue(), tail.GetLLVMValue());
+                    val = llvmBuilder->CreateBinOp(llvm::Instruction::FDiv, rel.GetLLVMValue(), arithOp_.GetLLVMValue());
                 }
                 else
                 {
-                    val = llvmBuilder->CreateBinOp(llvm::Instruction::SDiv, rel.GetLLVMValue(), tail.GetLLVMValue());
+                    val = llvmBuilder->CreateBinOp(llvm::Instruction::SDiv, rel.GetLLVMValue(), arithOp_.GetLLVMValue());
                 }
                 break;
             default:
@@ -1389,7 +1448,7 @@ Symbol Parser::ArithOpTypeCheck(Symbol expectedType, Symbol rel, Symbol tail, to
         }
         else
         {
-            if (rel.GetType() == T_FLOAT || tail.GetType() == T_FLOAT)
+            if (rel.GetType() == T_FLOAT || arithOp_.GetType() == T_FLOAT)
             {
                 sym.SetType(T_FLOAT);
             }
@@ -1413,12 +1472,12 @@ Symbol Parser::Relation(Symbol expectedType)
 
     Symbol term = Term(expectedType);
     token_t *op = scanner.PeekToken();
-    Symbol relTail = RelationTail(expectedType);
+    Symbol relation_ = Relation_(expectedType);
 
-    return RelationTypeCheck(expectedType, term, relTail, op);
+    return RelationTypeCheck(expectedType, term, relation_, op);
 }
 
-Symbol Parser::RelationTail(Symbol expectedType)
+Symbol Parser::Relation_(Symbol expectedType)
 {
     PrintDebugInfo("<relation_tail>");
 
@@ -1431,9 +1490,9 @@ Symbol Parser::RelationTail(Symbol expectedType)
     {
         Symbol term = Term(expectedType);
         token_t *op = scanner.PeekToken();
-        Symbol relTail = RelationTail(expectedType);
+        Symbol relation_ = Relation_(expectedType);
 
-        return RelationTypeCheck(expectedType, term, relTail, op);
+        return RelationTypeCheck(expectedType, term, relation_, op);
     }
 
     Symbol sym = Symbol();
@@ -1442,18 +1501,19 @@ Symbol Parser::RelationTail(Symbol expectedType)
     return sym;
 }
 
-Symbol Parser::RelationTypeCheck(Symbol expectedType, Symbol term, Symbol relTail, token_t *op)
+Symbol Parser::RelationTypeCheck(Symbol expectedType, Symbol term, Symbol relation_, token_t *op)
 {
-    if (relTail.IsValid())
+    if (relation_.IsValid())
     {
         Symbol sym = Symbol();
         bool isInterop = false;
         bool isFloatOp = false;
 
+        // TODO: make this a switch?
         if (term.GetType() == T_BOOL)
         {
-            isInterop = (relTail.GetType() == T_BOOL || relTail.GetType() == T_INTEGER);
-            if (isInterop && relTail.GetType() == T_INTEGER)
+            isInterop = (relation_.GetType() == T_BOOL || relation_.GetType() == T_INTEGER);
+            if (isInterop && relation_.GetType() == T_INTEGER)
             {
                 llvm::Value *val = llvmBuilder->CreateZExtOrTrunc(term.GetLLVMValue(), llvmBuilder->getInt32Ty());
                 term.SetLLVMValue(val);
@@ -1462,24 +1522,24 @@ Symbol Parser::RelationTypeCheck(Symbol expectedType, Symbol term, Symbol relTai
         else if (term.GetType() == T_FLOAT)
         {
             isFloatOp = true;
-            isInterop = (relTail.GetType() == T_FLOAT || relTail.GetType() == T_INTEGER);
-            if (isInterop && relTail.GetType() == T_INTEGER)
+            isInterop = (relation_.GetType() == T_FLOAT || relation_.GetType() == T_INTEGER);
+            if (isInterop && relation_.GetType() == T_INTEGER)
             {
-                llvm::Value *val = llvmBuilder->CreateSIToFP(relTail.GetLLVMValue(), llvmBuilder->getFloatTy());
-                relTail.SetLLVMValue(val);
+                llvm::Value *val = llvmBuilder->CreateSIToFP(relation_.GetLLVMValue(), llvmBuilder->getFloatTy());
+                relation_.SetLLVMValue(val);
             }
         }
         else if (term.GetType() == T_INTEGER)
         {
-            isInterop = (relTail.GetType() == T_INTEGER || relTail.GetType() == T_FLOAT || relTail.GetType() == T_BOOL);
+            isInterop = (relation_.GetType() == T_INTEGER || relation_.GetType() == T_FLOAT || relation_.GetType() == T_BOOL);
             if (isInterop)
             {
-                if (relTail.GetType() == T_BOOL)
+                if (relation_.GetType() == T_BOOL)
                 {
-                    llvm::Value *val = llvmBuilder->CreateZExtOrTrunc(relTail.GetLLVMValue(), llvmBuilder->getInt32Ty());
-                    relTail.SetLLVMValue(val);
+                    llvm::Value *val = llvmBuilder->CreateZExtOrTrunc(relation_.GetLLVMValue(), llvmBuilder->getInt32Ty());
+                    relation_.SetLLVMValue(val);
                 }
-                else if (relTail.GetType() == T_FLOAT)
+                else if (relation_.GetType() == T_FLOAT)
                 {
                     llvm::Value *val = llvmBuilder->CreateSIToFP(term.GetLLVMValue(), llvmBuilder->getFloatTy());
                     term.SetLLVMValue(val);
@@ -1489,13 +1549,12 @@ Symbol Parser::RelationTypeCheck(Symbol expectedType, Symbol term, Symbol relTai
         }
         else if (term.GetType() == T_STRING)
         {
-
-            isInterop = ((op->type == T_EQEQ || op->type == T_NOTEQ) && (relTail.GetType() == T_STRING));
+            isInterop = ((op->type == T_EQEQ || op->type == T_NOTEQ) && (relation_.GetType() == T_STRING));
         }
 
         if (!isInterop)
         {
-            ReportOpTypeCheckError("relational", TypeToString(term.GetType()), TypeToString(relTail.GetType()));
+            ReportOpTypeCheckError("relational", TypeToString(term.GetType()), TypeToString(relation_.GetType()));
             sym.SetIsValid(false);
             return sym;
         }
@@ -1521,7 +1580,7 @@ Symbol Parser::RelationTypeCheck(Symbol expectedType, Symbol term, Symbol relTai
 
             llvm::Value *termAddr = llvmBuilder->CreateGEP(term.GetLLVMValue(), idx);
             llvm::Value *termChar = llvmBuilder->CreateLoad(llvmBuilder->getInt8Ty(), termAddr);
-            llvm::Value *tailAddr = llvmBuilder->CreateGEP(relTail.GetLLVMValue(), idx);
+            llvm::Value *tailAddr = llvmBuilder->CreateGEP(relation_.GetLLVMValue(), idx);
             llvm::Value *tailChar = llvmBuilder->CreateLoad(llvmBuilder->getInt8Ty(), tailAddr);
             llvm::Value *cmp = llvmBuilder->CreateICmpEQ(termChar, tailChar);
 
@@ -1546,63 +1605,68 @@ Symbol Parser::RelationTypeCheck(Symbol expectedType, Symbol term, Symbol relTai
             switch (op->type)
             {
                 case T_EQEQ:
-                    if (isFloatOp) {
+                    if (isFloatOp)
+                    {
 
-                        val = llvmBuilder->CreateFCmpOEQ(term.GetLLVMValue(), relTail.GetLLVMValue());
+                        val = llvmBuilder->CreateFCmpOEQ(term.GetLLVMValue(), relation_.GetLLVMValue());
                     }
                     else
                     {
-                        val = llvmBuilder->CreateICmpEQ(term.GetLLVMValue(), relTail.GetLLVMValue());
+                        val = llvmBuilder->CreateICmpEQ(term.GetLLVMValue(), relation_.GetLLVMValue());
                     }
                     break;
                 case T_NOTEQ:
-                    if (isFloatOp) {
+                    if (isFloatOp)
+                    {
 
-                        val = llvmBuilder->CreateFCmpONE(term.GetLLVMValue(), relTail.GetLLVMValue());
+                        val = llvmBuilder->CreateFCmpONE(term.GetLLVMValue(), relation_.GetLLVMValue());
                     }
                     else
                     {
-                        val = llvmBuilder->CreateICmpNE(term.GetLLVMValue(), relTail.GetLLVMValue());
+                        val = llvmBuilder->CreateICmpNE(term.GetLLVMValue(), relation_.GetLLVMValue());
                     }
                     break;
                 case T_LESSTHAN:
-                    if (isFloatOp) {
+                    if (isFloatOp)
+                    {
 
-                        val = llvmBuilder->CreateFCmpOLT(term.GetLLVMValue(), relTail.GetLLVMValue());
+                        val = llvmBuilder->CreateFCmpOLT(term.GetLLVMValue(), relation_.GetLLVMValue());
                     }
                     else
                     {
-                        val = llvmBuilder->CreateICmpSLT(term.GetLLVMValue(), relTail.GetLLVMValue());
+                        val = llvmBuilder->CreateICmpSLT(term.GetLLVMValue(), relation_.GetLLVMValue());
                     }
                     break;
                 case T_LTEQ:
-                    if (isFloatOp) {
-
-                        val = llvmBuilder->CreateFCmpOLE(term.GetLLVMValue(), relTail.GetLLVMValue());
+                    if (isFloatOp)
+                    {
+                        val = llvmBuilder->CreateFCmpOLE(term.GetLLVMValue(), relation_.GetLLVMValue());
                     }
                     else
                     {
-                        val = llvmBuilder->CreateICmpSLE(term.GetLLVMValue(), relTail.GetLLVMValue());
+                        val = llvmBuilder->CreateICmpSLE(term.GetLLVMValue(), relation_.GetLLVMValue());
                     }
                     break;
                 case T_GREATERTHAN:
-                    if (isFloatOp) {
+                    if (isFloatOp)
+                    {
 
-                        val = llvmBuilder->CreateFCmpOGT(term.GetLLVMValue(), relTail.GetLLVMValue());
+                        val = llvmBuilder->CreateFCmpOGT(term.GetLLVMValue(), relation_.GetLLVMValue());
                     }
                     else
                     {
-                        val = llvmBuilder->CreateICmpSGT(term.GetLLVMValue(), relTail.GetLLVMValue());
+                        val = llvmBuilder->CreateICmpSGT(term.GetLLVMValue(), relation_.GetLLVMValue());
                     }
                     break;
                 case T_GTEQ:
-                    if (isFloatOp) {
+                    if (isFloatOp)
+                    {
 
-                        val = llvmBuilder->CreateFCmpOGE(term.GetLLVMValue(), relTail.GetLLVMValue());
+                        val = llvmBuilder->CreateFCmpOGE(term.GetLLVMValue(), relation_.GetLLVMValue());
                     }
                     else
                     {
-                        val = llvmBuilder->CreateICmpSGE(term.GetLLVMValue(), relTail.GetLLVMValue());
+                        val = llvmBuilder->CreateICmpSGE(term.GetLLVMValue(), relation_.GetLLVMValue());
                     }
                     break;
                 default:
@@ -1627,12 +1691,12 @@ Symbol Parser::Term(Symbol expectedType)
 
     Symbol factor = Factor(expectedType);
     token_t *op = scanner.PeekToken();
-    Symbol termTail = TermTail(expectedType);
+    Symbol termTail = Term_(expectedType);
 
     return ArithOpTypeCheck(expectedType, factor, termTail, op);
 }
 
-Symbol Parser::TermTail(Symbol expectedType)
+Symbol Parser::Term_(Symbol expectedType)
 {
     PrintDebugInfo("<term_tail>");
 
@@ -1640,7 +1704,7 @@ Symbol Parser::TermTail(Symbol expectedType)
     {
         Symbol factor = Factor(expectedType);
         token_t *op = scanner.PeekToken();
-        Symbol termTail = TermTail(expectedType);
+        Symbol termTail = Term_(expectedType);
 
         return ArithOpTypeCheck(expectedType, factor, termTail, op);
     }
