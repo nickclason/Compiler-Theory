@@ -29,7 +29,7 @@ end procedure;
 
 begin
 
-max := 12;//getInteger();
+max := getInteger();
 for(i := 0; i < max)
 	x := Fib(i);
 	out := putInteger(x);
