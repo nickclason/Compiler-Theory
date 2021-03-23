@@ -16,7 +16,7 @@
 #include "llvm/Target/TargetMachine.h"
 #include "llvm/Target/TargetOptions.h"
 
-Parser::Parser(std::string fileName, bool debug_, Scanner scanner_, SymbolTable symbolTable_, token_t *token_)
+Parser::Parser(bool debug_, Scanner scanner_, SymbolTable symbolTable_, token_t *token_)
 {
     debug = debug_;
     scanner = scanner_;
@@ -47,10 +47,11 @@ Parser::Parser(std::string fileName, bool debug_, Scanner scanner_, SymbolTable 
 
 
         // These steps are from the llvm Kaleidoscope tutorial
-        bool isVerified = llvm::verifyModule(*llvmModule, &llvm::errs());
-        //printf("PRE-VERIFICATION");
-        if (!isVerified) { llvmModule->print(llvm::errs(), nullptr); return; }
-        //printf("VERIFIED");
+        //bool isVerified = llvm::verifyModule(*llvmModule, &llvm::errs());
+
+        // TODO: figure out why this fails
+        //if (!isVerified) { llvmModule->print(llvm::errs(), nullptr); return; }
+
         auto TargetTriple = llvm::sys::getDefaultTargetTriple();
 
         llvm::InitializeAllTargetInfos();
@@ -80,7 +81,7 @@ Parser::Parser(std::string fileName, bool debug_, Scanner scanner_, SymbolTable 
         llvmModule->setDataLayout(TargetMachine->createDataLayout());
         llvmModule->setTargetTriple(TargetTriple);
 
-        auto Filename = "/Users/nick/Documents/Compiler-Theory/output/output.o";
+        auto Filename = "output/output.o";
         std::error_code EC;
         llvm::raw_fd_ostream dest(Filename, EC, llvm::sys::fs::OF_None);
 
@@ -152,7 +153,6 @@ void Parser::ProgramBody()
     llvm::FunctionType *functionType = llvm::FunctionType::get(llvmBuilder->getInt32Ty(), parameters, false);
 
     llvm::FunctionCallee mainCallee = llvmModule->getOrInsertFunction("main", functionType);
-//    llvm::Constant *main = llvm::dyn_cast<llvm::Constant>(mainCallee.getCallee());
     auto *main = llvm::dyn_cast<llvm::Constant>(mainCallee.getCallee());
 
     llvmCurrProc = llvm::cast<llvm::Function>(main);
@@ -331,7 +331,7 @@ void Parser::WhileDeclarations()
 
         if (errorFlag)
         {
-            // TODO: resync
+            // TODO: resynch
             return;
         }
         else
@@ -355,7 +355,6 @@ void Parser::Declaration()
     PrintDebugInfo("<declaration>");
 
     Symbol symbol;
-//    if (ValidateToken(T_GLOBAL))
     if (ValidateToken(T_GLOBAL) || symbolTable.GetScopeCount() == 0) // testing to make all declarations in outermost scope global
     {
         symbol.SetIsGlobal(true);

@@ -56,8 +56,7 @@ void PeekTest(std::string fileName)
 
 int main()
 {
-    std::string fileName_ = GetFileName();
-    std::string fileName = "/Users/nick/Documents/Compiler-Theory/testPgms/correct/" + fileName_;
+    std::string fileName = GetFileName();
     Scanner scanner;
     SymbolTable symbolTable;
 
@@ -65,7 +64,7 @@ int main()
     scanner.InitScanner(fileName);
     token_t *token = new token_t();
 
-    Parser *p = new Parser(fileName, false, scanner, symbolTable, token);
+    Parser *p = new Parser(false, scanner, symbolTable, token);
 
     return 0;
 }

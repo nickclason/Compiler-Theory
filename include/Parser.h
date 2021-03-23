@@ -18,7 +18,7 @@ class Parser
 {
 public:
 
-    Parser(std::string fileName, bool debug_, Scanner scanner_, SymbolTable symbolTable_, token_t *token_);
+    Parser(bool debug_, Scanner scanner_, SymbolTable symbolTable_, token_t *token_);
     ~Parser();
 
     void Program();
@@ -57,7 +57,7 @@ private:
 
     void ReportWarning(std::string msg);
 
-    void Resync(token_t tokens[], int length);
+    void Resync(int tokens[], int length);
 
 
     // Parsing
