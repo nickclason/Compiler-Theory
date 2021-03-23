@@ -35,27 +35,12 @@ Parser::Parser(std::string fileName, bool debug_, Scanner scanner_, SymbolTable 
     llvmCurrProc = nullptr;
 
     Program();
-//    if (debug)
-//    {
-//        llvmModule->print(llvm::errs(), nullptr);
-//
-//        fileName.erase(fileName.begin(), fileName.begin()+57);
-//
-//        fileName.erase(fileName.end()-4, fileName.end());
-//        std::string outFile = "/Users/nick/Documents/Compiler-Theory/out/" + fileName + ".ll";
-//        std::error_code error_code;
-//        llvm::raw_fd_ostream out(outFile, error_code, llvm::sys::fs::F_None);
-//        llvmModule->print(out, nullptr);
-//    }
-
-
-
 
     if (!errorFlag && errorCount == 0)
     {
         std::cout << "Parse was successful." << std::endl;
 
-        std::string outFile = "/Users/nick/Documents/Compiler-Theory/output/IR.ll";
+        std::string outFile = "output/IR.ll";
         std::error_code error_code;
         llvm::raw_fd_ostream out(outFile, error_code, llvm::sys::fs::F_None);
         llvmModule->print(out, nullptr);
@@ -64,7 +49,7 @@ Parser::Parser(std::string fileName, bool debug_, Scanner scanner_, SymbolTable 
         // These steps are from the llvm Kaleidoscope tutorial
         bool isVerified = llvm::verifyModule(*llvmModule, &llvm::errs());
         //printf("PRE-VERIFICATION");
-//        if (!isVerified) { llvmModule->print(llvm::errs(), nullptr); return; }
+        if (!isVerified) { llvmModule->print(llvm::errs(), nullptr); return; }
         //printf("VERIFIED");
         auto TargetTriple = llvm::sys::getDefaultTargetTriple();
 
