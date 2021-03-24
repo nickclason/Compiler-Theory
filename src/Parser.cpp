@@ -40,66 +40,8 @@ Parser::Parser(bool debug_, Scanner scanner_, SymbolTable symbolTable_, token_t 
     {
         std::cout << "Parse was successful." << std::endl;
 
-        std::string outFile = "output/IR.ll";
-        std::error_code error_code;
-        llvm::raw_fd_ostream out(outFile, error_code, llvm::sys::fs::F_None);
-        llvmModule->print(out, nullptr);
-
-
-        // These steps are from the llvm Kaleidoscope tutorial
-        //bool isVerified = llvm::verifyModule(*llvmModule, &llvm::errs());
-
-        // TODO: figure out why this fails
-        //if (!isVerified) { llvmModule->print(llvm::errs(), nullptr); return; }
-
-        auto TargetTriple = llvm::sys::getDefaultTargetTriple();
-
-        llvm::InitializeAllTargetInfos();
-        llvm::InitializeAllTargets();
-        llvm::InitializeAllTargetMCs();
-        llvm::InitializeAllAsmParsers();
-        llvm::InitializeAllAsmPrinters();
-
-        std::string Error;
-        auto Target = llvm::TargetRegistry::lookupTarget(TargetTriple, Error);
-
-
-        if (!Target) {
-            llvm::errs() << Error;
-            return;
-        }
-
-        //printf("TARGET");
-
-        auto CPU = "generic";
-        auto Features = "";
-
-        llvm::TargetOptions opt;
-        auto RM = llvm::Optional<llvm::Reloc::Model>();
-        auto TargetMachine = Target->createTargetMachine(TargetTriple, CPU, Features, opt, RM);
-
-        llvmModule->setDataLayout(TargetMachine->createDataLayout());
-        llvmModule->setTargetTriple(TargetTriple);
-
-        auto Filename = "output/output.o";
-        std::error_code EC;
-        llvm::raw_fd_ostream dest(Filename, EC, llvm::sys::fs::OF_None);
-
-        if (EC) {
-            llvm::errs() << "Could not open file: " << EC.message();
-            return;
-        }
-
-        llvm::legacy::PassManager pass;
-        auto FileType = llvm::CGFT_ObjectFile;
-
-        if (TargetMachine->addPassesToEmitFile(pass, dest, nullptr, FileType)) {
-            llvm::errs() << "TargetMachine can't emit a file of this type";
-            return;
-        }
-
-        pass.run(*llvmModule);
-        dest.flush();
+        // Compile
+        InitLLVM();
     }
 }
 
@@ -199,6 +141,69 @@ void Parser::ProgramBody()
         llvm::Constant *retVal = llvm::ConstantInt::getIntegerValue(llvmBuilder->getInt32Ty(), llvm::APInt(32, 0, true));
         llvmBuilder->CreateRet(retVal);
     }
+}
+
+void Parser::InitLLVM()
+{
+    std::string outFile = "output/IR.ll";
+    std::error_code error_code;
+    llvm::raw_fd_ostream out(outFile, error_code, llvm::sys::fs::F_None);
+    llvmModule->print(out, nullptr);
+
+    // These steps are from the llvm Kaleidoscope tutorial
+    //bool isVerified = llvm::verifyModule(*llvmModule, &llvm::errs());
+
+    // TODO: figure out why this fails
+    //if (!isVerified) { llvmModule->print(llvm::errs(), nullptr); return; }
+
+    auto TargetTriple = llvm::sys::getDefaultTargetTriple();
+
+    llvm::InitializeAllTargetInfos();
+    llvm::InitializeAllTargets();
+    llvm::InitializeAllTargetMCs();
+    llvm::InitializeAllAsmParsers();
+    llvm::InitializeAllAsmPrinters();
+
+    std::string Error;
+    auto Target = llvm::TargetRegistry::lookupTarget(TargetTriple, Error);
+
+
+    if (!Target) {
+        llvm::errs() << Error;
+        return;
+    }
+
+    //printf("TARGET");
+
+    auto CPU = "generic";
+    auto Features = "";
+
+    llvm::TargetOptions opt;
+    auto RM = llvm::Optional<llvm::Reloc::Model>();
+    auto TargetMachine = Target->createTargetMachine(TargetTriple, CPU, Features, opt, RM);
+
+    llvmModule->setDataLayout(TargetMachine->createDataLayout());
+    llvmModule->setTargetTriple(TargetTriple);
+
+    auto Filename = "output/output.o";
+    std::error_code EC;
+    llvm::raw_fd_ostream dest(Filename, EC, llvm::sys::fs::OF_None);
+
+    if (EC) {
+        llvm::errs() << "Could not open file: " << EC.message();
+        return;
+    }
+
+    llvm::legacy::PassManager pass;
+    auto FileType = llvm::CGFT_ObjectFile;
+
+    if (TargetMachine->addPassesToEmitFile(pass, dest, nullptr, FileType)) {
+        llvm::errs() << "TargetMachine can't emit a file of this type";
+        return;
+    }
+
+    pass.run(*llvmModule);
+    dest.flush();
 }
 
 bool Parser::ValidateToken(int tokenType)
@@ -331,7 +336,7 @@ void Parser::WhileDeclarations()
 
         if (errorFlag)
         {
-            // TODO: resynch
+            // TODO: resync
             return;
         }
         else
@@ -1166,7 +1171,7 @@ Symbol Parser::Destination()
     }
     else
     {
-        // TODO: no index was supplied array unwrapping
+        // TODO: no index was supplied; array unwrapping
     }
 
     // If we get here, the destination is valid and not an array
@@ -1493,49 +1498,47 @@ Symbol Parser::RelationTypeCheck(Symbol expectedType, Symbol term, Symbol relati
         bool isInterop = false;
         bool isFloatOp = false;
 
-        // TODO: make this a switch?
-        if (term.GetType() == T_BOOL)
+        switch (term.GetType())
         {
-            isInterop = (relation_.GetType() == T_BOOL || relation_.GetType() == T_INTEGER);
-            if (isInterop && relation_.GetType() == T_INTEGER)
-            {
-                llvm::Value *val = llvmBuilder->CreateZExtOrTrunc(term.GetLLVMValue(), llvmBuilder->getInt32Ty());
-                term.SetLLVMValue(val);
-            }
-        }
-        else if (term.GetType() == T_FLOAT)
-        {
-            isFloatOp = true;
-            isInterop = (relation_.GetType() == T_FLOAT || relation_.GetType() == T_INTEGER);
-            if (isInterop && relation_.GetType() == T_INTEGER)
-            {
-                llvm::Value *val = llvmBuilder->CreateSIToFP(relation_.GetLLVMValue(), llvmBuilder->getFloatTy());
-                relation_.SetLLVMValue(val);
-            }
-        }
-        else if (term.GetType() == T_INTEGER)
-        {
-            isInterop = (relation_.GetType() == T_INTEGER || relation_.GetType() == T_FLOAT || relation_.GetType() == T_BOOL);
-            if (isInterop)
-            {
-                if (relation_.GetType() == T_BOOL)
+            case T_BOOL:
+                isInterop = (relation_.GetType() == T_BOOL || relation_.GetType() == T_INTEGER);
+                if (isInterop && relation_.GetType() == T_INTEGER)
                 {
-                    llvm::Value *val = llvmBuilder->CreateZExtOrTrunc(relation_.GetLLVMValue(), llvmBuilder->getInt32Ty());
+                    llvm::Value *val = llvmBuilder->CreateZExtOrTrunc(term.GetLLVMValue(), llvmBuilder->getInt32Ty());
+                    term.SetLLVMValue(val);
+                }
+                break;
+            case T_FLOAT:
+                isFloatOp = true;
+                isInterop = (relation_.GetType() == T_FLOAT || relation_.GetType() == T_INTEGER);
+                if (isInterop && relation_.GetType() == T_INTEGER)
+                {
+                    llvm::Value *val = llvmBuilder->CreateSIToFP(relation_.GetLLVMValue(), llvmBuilder->getFloatTy());
                     relation_.SetLLVMValue(val);
                 }
-                else if (relation_.GetType() == T_FLOAT)
+                break;
+            case T_INTEGER:
+                isInterop = (relation_.GetType() == T_INTEGER || relation_.GetType() == T_FLOAT || relation_.GetType() == T_BOOL);
+                if (isInterop)
                 {
-                    llvm::Value *val = llvmBuilder->CreateSIToFP(term.GetLLVMValue(), llvmBuilder->getFloatTy());
-                    term.SetLLVMValue(val);
-                    isFloatOp = true;
+                    if (relation_.GetType() == T_BOOL)
+                    {
+                        llvm::Value *val = llvmBuilder->CreateZExtOrTrunc(relation_.GetLLVMValue(), llvmBuilder->getInt32Ty());
+                        relation_.SetLLVMValue(val);
+                    }
+                    else if (relation_.GetType() == T_FLOAT)
+                    {
+                        llvm::Value *val = llvmBuilder->CreateSIToFP(term.GetLLVMValue(), llvmBuilder->getFloatTy());
+                        term.SetLLVMValue(val);
+                        isFloatOp = true;
+                    }
                 }
-            }
+                break;
+            case T_STRING:
+                isInterop = ((op->type == T_EQEQ || op->type == T_NOTEQ) && (relation_.GetType() == T_STRING));
+                break;
         }
-        else if (term.GetType() == T_STRING)
-        {
-            isInterop = ((op->type == T_EQEQ || op->type == T_NOTEQ) && (relation_.GetType() == T_STRING));
-        }
-
+        
         if (!isInterop)
         {
             ReportOpTypeCheckError("relational", TypeToString(term.GetType()), TypeToString(relation_.GetType()));

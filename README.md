@@ -16,5 +16,3 @@ gcc output/output.o src/runtime.c
 
 ./a.out
 ```
-
-
