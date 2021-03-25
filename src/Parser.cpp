@@ -25,6 +25,7 @@ Parser::Parser(bool debug_, Scanner scanner_, SymbolTable symbolTable_, token_t 
 
     stopParse = false;
     errorFlag = false;
+    doCompile = true;
 
     procedureCount = 0;
     errorCount = 0;
@@ -41,7 +42,10 @@ Parser::Parser(bool debug_, Scanner scanner_, SymbolTable symbolTable_, token_t 
         std::cout << "Parse was successful." << std::endl;
 
         // Compile
-        InitLLVM();
+        if (doCompile)
+        {
+            InitLLVM();
+        }
     }
 }
 
@@ -1538,7 +1542,7 @@ Symbol Parser::RelationTypeCheck(Symbol expectedType, Symbol term, Symbol relati
                 isInterop = ((op->type == T_EQEQ || op->type == T_NOTEQ) && (relation_.GetType() == T_STRING));
                 break;
         }
-        
+
         if (!isInterop)
         {
             ReportOpTypeCheckError("relational", TypeToString(term.GetType()), TypeToString(relation_.GetType()));

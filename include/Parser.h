@@ -34,6 +34,7 @@ private:
     int warningCount;
 
     bool debug;
+    bool doCompile;
     bool stopParse;
     bool errorFlag;
 
