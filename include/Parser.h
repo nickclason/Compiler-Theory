@@ -32,16 +32,23 @@ private:
     int procedureCount;
     int errorCount;
     int warningCount;
+    int unwrapSize;
+
 
     bool debug;
     bool doCompile;
     bool stopParse;
     bool errorFlag;
+    bool unwrap;
 
     llvm::Module *llvmModule;
     llvm::IRBuilder<> *llvmBuilder;
     llvm::LLVMContext llvmContext;
     llvm::Function *llvmCurrProc;
+    llvm::Value *llvmUnwrapIdx;
+    llvm::Value *llvmUnwrapIdxAddr;
+    llvm::BasicBlock *llvmUnwrapHead;
+    llvm::BasicBlock *llvmUnwrapEnd;
 
 
     // General/Utility Functions

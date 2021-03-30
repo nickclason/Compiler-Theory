@@ -1,0 +1,23 @@
+program test_program is
+    variable x : integer[3];
+    variable i : integer;
+    variable tmp : bool;
+begin
+    x[0] := 1;
+    x[1] := 2;
+    x[2] := 3;
+
+    for (i := 0; i < 3)
+            tmp := putInteger(x[i]); // x = [1, 2, 3]
+            i := i+1;
+    end for;
+
+    tmp := putString("");
+    x := x * 2;
+
+    for (i := 0; i < 3)
+        tmp := putInteger(x[i]); // x = [2, 4, 6]
+        i := i+1;
+    end for;
+
+end program .

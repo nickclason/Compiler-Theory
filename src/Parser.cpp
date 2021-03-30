@@ -26,21 +26,27 @@ Parser::Parser(bool debug_, Scanner scanner_, SymbolTable symbolTable_, token_t 
     stopParse = false;
     errorFlag = false;
     doCompile = true;
+    unwrap = false;
 
     procedureCount = 0;
     errorCount = 0;
     warningCount = 0;
+    unwrapSize = 0;
 
     llvmModule = nullptr;
     llvmBuilder = nullptr;
     llvmCurrProc = nullptr;
+    llvmUnwrapIdx = nullptr;
+    llvmUnwrapIdxAddr = nullptr;
+    llvmUnwrapHead = nullptr;
+    llvmUnwrapEnd = nullptr;
 
     Program();
 
     if (!errorFlag && errorCount == 0)
     {
         std::cout << "Parse was successful." << std::endl;
-
+        std::cout << "Compiling..." << std::endl;
         // Compile
         if (doCompile)
         {
@@ -109,18 +115,35 @@ void Parser::ProgramBody()
 
     for (auto &it : symbolTable.GetLocalScope())
     {
-        // removed per revision 5 of projectLanguage.pdf
-        // if (it.second.GetDeclarationType() != T_VARIABLE || it.second.IsGlobal())
+
         if (it.second.GetDeclarationType() != T_VARIABLE)
         {
             continue;
         }
 
         llvm::Value *address = nullptr;
-        // array
-        address = llvmBuilder->CreateAlloca(GetLLVMType(it.second));
-        it.second.SetLLVMAddress(address);
+        if (it.second.IsArray())
+        {
+            // TODO: modify this to be my own
+            // create a value for the bound
+            llvm::Value *bound = llvm::ConstantInt::getIntegerValue(llvmBuilder->getInt32Ty(),
+                    llvm::APInt(32, it.second.GetArraySize(), true));
 
+            it.second.SetLLVMArraySize(bound);
+
+            // allocate array
+            address = llvmBuilder->CreateAlloca(GetLLVMType(it.second), bound);
+
+            it.second.SetLLVMArrayAddress(address);
+
+            // arrays are also considered to already be initialized
+            it.second.SetIsInitialized(true);
+        }
+        else
+        {
+            address = llvmBuilder->CreateAlloca(GetLLVMType(it.second));
+            it.second.SetLLVMAddress(address);
+        }
         symbolTable.AddSymbol(it.second); // Update symbol table
     }
 
@@ -171,7 +194,6 @@ void Parser::InitLLVM()
     std::string Error;
     auto Target = llvm::TargetRegistry::lookupTarget(TargetTriple, Error);
 
-
     if (!Target) {
         llvm::errs() << Error;
         return;
@@ -208,6 +230,9 @@ void Parser::InitLLVM()
 
     pass.run(*llvmModule);
     dest.flush();
+
+    std::cout << "Compilation was successful" << std::endl;
+
 }
 
 bool Parser::ValidateToken(int tokenType)
@@ -705,13 +730,13 @@ void Parser::Bound(Symbol &symbol)
 
     Symbol bound = Number();
     int size = token->val.intValue;
-    bound.SetArraySize(size);
+//    bound.SetArraySize(size);
+    symbol.SetArraySize(size);
 }
 
 void Parser::WhileStatements(int terminators[], int terminatorsSize)
 {
     bool continue_ = true;
-
     for (int i = 0; i < terminatorsSize; i++)
     {
         if (ValidateToken(terminators[i]))
@@ -790,9 +815,7 @@ void Parser::AssignmentStatement()
     }
 
     Symbol expr = Expression(dest);
-
     expr = AssignmentTypeCheck(dest, expr, token);
-
     if (!expr.IsValid())
     {
         return;
@@ -800,10 +823,30 @@ void Parser::AssignmentStatement()
 
     llvmBuilder->CreateStore(expr.GetLLVMValue(), dest.GetLLVMAddress());
     dest.SetLLVMValue(expr.GetLLVMValue());
-    // symbolTable.AddSymbol(dest); // Update symbol
+    symbolTable.AddSymbol(dest); // Update symbol TODO: idk if i need this
+
+    // TODO: Unwrap is NOT True! it should be!!!
+    if (unwrap)
+    {
+        llvm::Value *one = llvm::ConstantInt::getIntegerValue(llvmBuilder->getInt32Ty(), llvm::APInt(32, 1, true));
+        llvmUnwrapIdx = llvmBuilder->CreateAdd(llvmUnwrapIdx, one);
+        llvmBuilder->CreateStore(llvmUnwrapIdx, llvmUnwrapIdxAddr);
+        llvmBuilder->CreateBr(llvmUnwrapHead);
+        llvmBuilder->SetInsertPoint(llvmUnwrapEnd);
+        unwrap = false;
+
+//        llvm::Value *one_32b = llvm::ConstantInt::getIntegerValue(llvmBuilder->getInt32Ty(), llvm::APInt(32, 1, true));
+//        llvmUnwrapIdx = llvmBuilder->CreateAdd(llvmUnwrapIdx, one_32b);
+//        llvmBuilder->CreateStore(llvmUnwrapIdx, llvmUnwrapIdxAddr);
+//        llvmBuilder->CreateBr(llvmUnwrapHead);
+//
+//        llvmBuilder->SetInsertPoint(llvmUnwrapEnd);
+//        unwrap = false;
+    }
 
     dest.SetIsInitialized(true);
     symbolTable.AddSymbol(dest); // Update
+
 }
 
 void Parser::IfStatement()
@@ -1024,6 +1067,7 @@ void Parser::ReturnStatement()
 
 Symbol Parser::IndexArray(Symbol symbol)
 {
+
     symbol.SetIsArrayIndexed(true);
 
     Symbol sym = Symbol();
@@ -1090,6 +1134,7 @@ Symbol Parser::IndexArray(Symbol symbol)
     symbol.SetLLVMAddress(address);
 
     return symbol;
+
 }
 
 Symbol Parser::AssignmentTypeCheck(Symbol dest, Symbol expr, token_t *token)
@@ -1170,12 +1215,48 @@ Symbol Parser::Destination()
 
     if (ValidateToken(T_LBRACKET))
     {
-        // get index
         dest = IndexArray(dest);
     }
     else
     {
-        // TODO: no index was supplied; array unwrapping
+        // array unwrap/unwind
+        if (dest.IsArray())
+        {
+            dest.SetIsArrayIndexed(true);
+            unwrap = true;
+            unwrapSize = dest.GetArraySize();
+
+            llvm::Value *zero = llvm::ConstantInt::getIntegerValue(llvmBuilder->getInt32Ty(), llvm::APInt(32, 0, true));
+            llvmUnwrapIdx = zero;
+            llvmUnwrapIdxAddr = llvmBuilder->CreateAlloca(llvmBuilder->getInt32Ty());
+            llvmBuilder->CreateStore(llvmUnwrapIdx, llvmUnwrapIdxAddr);
+
+            llvmUnwrapHead = llvm::BasicBlock::Create(llvmContext, "", llvmCurrProc);
+            llvm::BasicBlock *llvmUnwrapBody = llvm::BasicBlock::Create(llvmContext, "", llvmCurrProc);
+            llvmUnwrapEnd = llvm::BasicBlock::Create(llvmContext, "", llvmCurrProc);
+
+            llvmBuilder->CreateBr(llvmUnwrapHead);
+            llvmBuilder->SetInsertPoint(llvmUnwrapHead);
+            llvmUnwrapIdx = llvmBuilder->CreateLoad(llvmBuilder->getInt32Ty(), llvmUnwrapIdxAddr);
+
+            llvm::Value *cmp = llvmBuilder->CreateICmpEQ(llvmUnwrapIdx, dest.GetLLVMArraySize());
+            llvmBuilder->CreateCondBr(cmp, llvmUnwrapEnd, llvmUnwrapBody);
+            llvmBuilder->SetInsertPoint(llvmUnwrapBody);
+            llvmUnwrapIdx = llvmBuilder->CreateLoad(llvmBuilder->getInt32Ty(), llvmUnwrapIdxAddr);
+
+            llvm::Value *addr = nullptr;
+            if (dest.IsGlobal())
+            {
+                llvm::Value *vals[] = {zero, llvmUnwrapIdx};
+                addr = llvmBuilder->CreateInBoundsGEP(dest.GetLLVMArrayAddress(), vals);
+            }
+            else
+            {
+                addr = llvmBuilder->CreateGEP(dest.GetLLVMArrayAddress(), llvmUnwrapIdx);
+            }
+
+            dest.SetLLVMAddress(addr);
+        }
     }
 
     // If we get here, the destination is valid and not an array
@@ -1874,10 +1955,24 @@ Symbol Parser::ProcedureCallOrName()
 
             sym = IndexArray(sym);
         }
-//        else if (unwrapArray)
-//        {
-            // TODO: Array unwrapping
-//        }
+        else if (unwrap)
+        {
+            // array unwrap/unwind
+            if (sym.IsArray())
+            {
+                sym.SetIsArrayIndexed(true);
+                if (sym.GetArraySize() < unwrapSize)
+                {
+                    ReportError("Array size is smaller than destination size. Unwrap failed.");
+                    sym = Symbol();
+                    sym.SetIsValid(false);
+                    return sym;
+                }
+
+                llvm::Value *addr = llvmBuilder->CreateGEP(sym.GetLLVMArrayAddress(), llvmUnwrapIdx);
+                sym.SetLLVMAddress(addr);
+            }
+        }
         else
         {
             sym.SetIsArrayIndexed(false);

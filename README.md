@@ -3,16 +3,24 @@ Compiler for EECE 5183/6083
 
 ## Build Instructions
 ```
-make all 
+Requirements: clang++
+
+make
 ```
 
-## How to run
+## How to use
 ```
+Requirements: gcc
+
+Run compiler.sh (Bash script to run compiler and link runtime)
+
+or 
+
 ./output/compiler
 
-clang output/IR.ll src/runtime.c
-            or
 gcc output/output.o src/runtime.c 
 
+
+THEN
 ./a.out
 ```
