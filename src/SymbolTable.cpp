@@ -205,7 +205,7 @@ void SymbolTable::AddIOFunctions(llvm::Module *llvmModule, llvm::LLVMContext &ll
     putString.SetIsGlobal(true);
     putString.SetDeclarationType(T_PROCEDURE);
     type = llvm::FunctionType::get(llvmBuilder->getInt1Ty(),{llvmBuilder->getInt8PtrTy()},false);
-    procedure = llvm::Function::Create(type,llvm::Function::ExternalLinkage,putString.GetId(),llvmModule);
+    procedure = llvm::Function::Create(type, llvm::Function::ExternalLinkage, putString.GetId(), llvmModule);
     putString.SetLLVMFunction(procedure);
     AddSymbol(putString);
 
@@ -219,6 +219,30 @@ void SymbolTable::AddIOFunctions(llvm::Module *llvmModule, llvm::LLVMContext &ll
     getString.SetLLVMFunction(procedure);
     AddSymbol(getString);
 
+    Symbol sqrt;
+    sqrt.SetId("SQRT");
+    sqrt.SetType(T_FLOAT);
+    Symbol args;
+    args.SetId("num");
+    args.SetType(T_INTEGER);
+    args.SetDeclarationType(T_VARIABLE);
+    sqrt.GetParameters().push_back(args);
+    sqrt.SetIsGlobal(true);
+    sqrt.SetDeclarationType(T_PROCEDURE);
+    type = llvm::FunctionType::get(llvmBuilder->getFloatTy(), {llvmBuilder->getInt32Ty()}, false);
+    procedure = llvm::Function::Create(type, llvm::Function::ExternalLinkage, sqrt.GetId(), llvmModule);
+    sqrt.SetLLVMFunction(procedure);
+    AddSymbol(sqrt);
+
+    Symbol oobError;
+    oobError.SetId("OOB_ERROR");
+    oobError.SetType(T_BOOL);
+    oobError.SetIsGlobal(true);
+    oobError.SetDeclarationType(T_PROCEDURE);
+    type = llvm::FunctionType::get(llvmBuilder->getVoidTy(), {}, false);
+    procedure = llvm::Function::Create(type, llvm::Function::ExternalLinkage, oobError.GetId(), llvmModule);
+    oobError.SetLLVMFunction(procedure);
+    AddSymbol(oobError);
 }
 
 int SymbolTable::GetScopeCount()

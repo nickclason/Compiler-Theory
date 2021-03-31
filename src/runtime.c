@@ -67,8 +67,14 @@ char* GETSTRING()
     }
     return str;
 }
-//TODO: SQRT
-//void BOUNDSERROR() {
-//    printf("Error - out of bounds exception!\n");
-//    exit(1);
-//}
+
+float SQRT(int num)
+{
+    return sqrt((double)num);
+}
+
+void OOB_ERROR()
+{
+    printf("Out-of-bounds error\n");
+    exit(1);
+}

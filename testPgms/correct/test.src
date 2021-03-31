@@ -1,23 +1,18 @@
-program test_program is
-    variable x : integer[3];
-    variable i : integer;
+program test is
+    variable y : integer;
     variable tmp : bool;
-begin
-    x[0] := 1;
-    x[1] := 2;
-    x[2] := 3;
+    procedure oob : integer()
+        variable x : integer[3];
+        begin
+            x[0] := 1;
+            x[1] := 2;
+            x[2] := 3;
+            //x[100] := 10000;
 
-    for (i := 0; i < 3)
-            tmp := putInteger(x[i]); // x = [1, 2, 3]
-            i := i+1;
-    end for;
+            return x[1];
+    end procedure;
 
-    tmp := putString("");
-    x := x * 2;
-
-    for (i := 0; i < 3)
-        tmp := putInteger(x[i]); // x = [2, 4, 6]
-        i := i+1;
-    end for;
-
-end program .
+    begin
+        y := oob();
+        tmp := putInteger(y);
+end program.

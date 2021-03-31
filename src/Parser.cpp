@@ -2,6 +2,10 @@
 // Created by Nick Clason on 2/1/21.
 //
 
+// TODO: Global arrays don't work properly when operating on entire array.
+//       Arrays are allowing indexing outside of their bounds.
+
+
 #include "../include/Parser.h"
 
 #include <fstream>
@@ -115,7 +119,6 @@ void Parser::ProgramBody()
 
     for (auto &it : symbolTable.GetLocalScope())
     {
-
         if (it.second.GetDeclarationType() != T_VARIABLE)
         {
             continue;
@@ -124,19 +127,12 @@ void Parser::ProgramBody()
         llvm::Value *address = nullptr;
         if (it.second.IsArray())
         {
-            // TODO: modify this to be my own
-            // create a value for the bound
-            llvm::Value *bound = llvm::ConstantInt::getIntegerValue(llvmBuilder->getInt32Ty(),
-                    llvm::APInt(32, it.second.GetArraySize(), true));
+            llvm::Value *size = llvm::ConstantInt::getIntegerValue(llvmBuilder->getInt32Ty(),
+                                                                   llvm::APInt(32, it.second.GetArraySize(), true));
 
-            it.second.SetLLVMArraySize(bound);
-
-            // allocate array
-            address = llvmBuilder->CreateAlloca(GetLLVMType(it.second), bound);
-
+            it.second.SetLLVMArraySize(size);
+            address = llvmBuilder->CreateAlloca(GetLLVMType(it.second), size);
             it.second.SetLLVMArrayAddress(address);
-
-            // arrays are also considered to already be initialized
             it.second.SetIsInitialized(true);
         }
         else
@@ -144,14 +140,14 @@ void Parser::ProgramBody()
             address = llvmBuilder->CreateAlloca(GetLLVMType(it.second));
             it.second.SetLLVMAddress(address);
         }
-        symbolTable.AddSymbol(it.second); // Update symbol table
+        symbolTable.AddSymbol(it.second);
     }
 
     int terminators[] = { T_END };
     int terminatorsSize = 1;
     WhileStatements(terminators, terminatorsSize);
 
-    if (!(token->type == T_END))
+    if (token->type != T_END)
     {
         ReportMissingTokenError("END");
         return;
@@ -179,8 +175,6 @@ void Parser::InitLLVM()
 
     // These steps are from the llvm Kaleidoscope tutorial
     //bool isVerified = llvm::verifyModule(*llvmModule, &llvm::errs());
-
-    // TODO: figure out why this fails
     //if (!isVerified) { llvmModule->print(llvm::errs(), nullptr); return; }
 
     auto TargetTriple = llvm::sys::getDefaultTargetTriple();
@@ -654,7 +648,7 @@ void Parser::ProcedureBody() {
 
         if (newSymbol.IsArray())
         {
-            newSymbol.SetLLVMArrayAddress(val); // TODO: need to pass arrays by value, so the array needs to be copied instead of just reusing the address?
+            newSymbol.SetLLVMArrayAddress(val); // might need to pass arrays by value
         }
         else
         {
@@ -823,9 +817,8 @@ void Parser::AssignmentStatement()
 
     llvmBuilder->CreateStore(expr.GetLLVMValue(), dest.GetLLVMAddress());
     dest.SetLLVMValue(expr.GetLLVMValue());
-    symbolTable.AddSymbol(dest); // Update symbol TODO: idk if i need this
+    symbolTable.AddSymbol(dest);
 
-    // TODO: Unwrap is NOT True! it should be!!!
     if (unwrap)
     {
         llvm::Value *one = llvm::ConstantInt::getIntegerValue(llvmBuilder->getInt32Ty(), llvm::APInt(32, 1, true));
@@ -1115,7 +1108,13 @@ Symbol Parser::IndexArray(Symbol symbol)
     llvmBuilder->CreateCondBr(actualIdx, succ, fail);
     llvmBuilder->SetInsertPoint(fail);
 
-    // TODO: Need to somehow call a function to quit running if there is an index error?
+    // for any out of bounds errors
+    // this is treated as a runtime exception as the syntax would still be perfectly valid
+    //  i.e. variable x : integer[2]
+    //       x[100] := 1; this syntax is still valid in the eyes of the parser
+    //
+    Symbol oobError = symbolTable.FindSymbol("OOB_ERROR");
+    llvmBuilder->CreateCall(oobError.GetLLVMFunction());
 
     llvmBuilder->CreateBr(succ);
     llvmBuilder->SetInsertPoint(succ);
@@ -1341,7 +1340,7 @@ Symbol Parser::ExpressionTypeCheck(Symbol expectedType, Symbol arithOp, Symbol e
                 val = llvmBuilder->CreateOr(arithOp.GetLLVMValue(), expr_.GetLLVMValue());
                 break;
             default:
-                std::cout << "error in codegen for operation" << std::endl; // TODO: fix msg
+                std::cout << "Could not find an operation" << std::endl;
         }
 
         sym.SetLLVMValue(val);
@@ -1497,7 +1496,7 @@ Symbol Parser::ArithOpTypeCheck(Symbol expectedType, Symbol rel, Symbol arithOp_
                 }
                 break;
             default:
-                std::cout << "Error finding operation" << std::endl; // todo: fix msg
+                std::cout << "Could not find an operation" << std::endl;
         }
 
         sym.SetLLVMValue(val);
@@ -1742,7 +1741,7 @@ Symbol Parser::RelationTypeCheck(Symbol expectedType, Symbol term, Symbol relati
                     }
                     break;
                 default:
-                    std::cout << "Operation error in codegen" << std::endl; // todo: fix msg
+                    std::cout << "Could not find an operation" << std::endl;
             }
         }
 
@@ -1991,6 +1990,7 @@ Symbol Parser::ProcedureCallOrName()
             if (sym.IsArray() && !sym.IsArrayIndexed())
             {
                 // TODO: copy array into the val?
+                std::cout << "not sure if this is a problem... leaving it for now..." << std::endl;
             }
             else
             {
