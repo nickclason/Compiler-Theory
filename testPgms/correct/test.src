@@ -1,18 +1,9 @@
 program test is
     variable y : integer;
     variable tmp : bool;
-    procedure oob : integer()
-        variable x : integer[3];
-        begin
-            x[0] := 1;
-            x[1] := 2;
-            x[2] := 3;
-            //x[100] := 10000;
-
-            return x[1];
-    end procedure;
+    variable str : string;
 
     begin
-        y := oob();
-        tmp := putInteger(y);
+        str := getString();
+        tmp := putString(str);
 end program.

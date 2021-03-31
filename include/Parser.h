@@ -36,8 +36,8 @@ private:
 
 
     bool debug;
-    bool doCompile;
-    bool stopParse;
+    // bool doCompile;
+    // bool stopParse;
     bool errorFlag;
     bool unwrap;
 

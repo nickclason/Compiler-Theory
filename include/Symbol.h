@@ -66,6 +66,9 @@ public:
     llvm::Function *GetLLVMFunction() const;
     void SetLLVMFunction(llvm::Function *llvmFunction);
 
+    bool IsUsed() const;
+    void SetIsUsed(bool used);
+
 private:
 
     std::string id;
@@ -79,6 +82,7 @@ private:
     bool isInitialized;
     bool isValid;
     bool isIndexed;
+    bool isUsed;
 
     std::vector<Symbol> parameters;
 

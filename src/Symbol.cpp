@@ -16,6 +16,7 @@ Symbol::Symbol() {
     isInitialized = false;
     isValid = true;
     isIndexed = false;
+    isUsed = false;
 
     llvmAddress = nullptr;
     llvmValue = nullptr;
@@ -149,4 +150,14 @@ llvm::Function *Symbol::GetLLVMFunction() const {
 
 void Symbol::SetLLVMFunction(llvm::Function *llvmFunction) {
     Symbol::llvmFunction = llvmFunction;
+}
+
+bool Symbol::IsUsed() const
+{
+    return isUsed;
+}
+
+void Symbol::SetIsUsed(bool used)
+{
+    isUsed = used;
 }

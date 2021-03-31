@@ -2,9 +2,13 @@
 // Created by Nick Clason on 2/1/21.
 //
 
-// TODO: Global arrays don't work properly when operating on entire array.
-//       Arrays are allowing indexing outside of their bounds.
+// Interesting things about my compiler.
+//  - Tracks unused variables
+//  - Line and column number error reporting
+//
 
+// TODO: Global arrays don't work properly when operating on entire array.
+//       recursiveFib.src - is not written correctly -- not my fault
 
 #include "../include/Parser.h"
 
@@ -27,9 +31,9 @@ Parser::Parser(bool debug_, Scanner scanner_, SymbolTable symbolTable_, token_t 
     symbolTable = symbolTable_;
     token = token_;
 
-    stopParse = false;
+    //stopParse = false;
+    //doCompile = true;
     errorFlag = false;
-    doCompile = true;
     unwrap = false;
 
     procedureCount = 0;
@@ -49,13 +53,14 @@ Parser::Parser(bool debug_, Scanner scanner_, SymbolTable symbolTable_, token_t 
 
     if (!errorFlag && errorCount == 0)
     {
-        std::cout << "Parse was successful." << std::endl;
-        std::cout << "Compiling..." << std::endl;
-        // Compile
-        if (doCompile)
+        if (debug)
         {
-            InitLLVM();
+            std::cout << "Parse was successful." << std::endl;
+            std::cout << "Compiling..." << std::endl;
         }
+
+        // Compile
+        InitLLVM();
     }
 }
 
@@ -193,7 +198,7 @@ void Parser::InitLLVM()
         return;
     }
 
-    //printf("TARGET");
+    //printf("DEBUG: TARGET");
 
     auto CPU = "generic";
     auto Features = "";
@@ -225,8 +230,10 @@ void Parser::InitLLVM()
     pass.run(*llvmModule);
     dest.flush();
 
-    std::cout << "Compilation was successful" << std::endl;
-
+    if (debug)
+    {
+        std::cout << "Compilation was successful" << std::endl;
+    }
 }
 
 bool Parser::ValidateToken(int tokenType)

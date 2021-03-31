@@ -214,7 +214,7 @@ void SymbolTable::AddIOFunctions(llvm::Module *llvmModule, llvm::LLVMContext &ll
     getString.SetType(T_STRING);
     getString.SetIsGlobal(true);
     getString.SetDeclarationType(T_PROCEDURE);
-    type = llvm::FunctionType::get(llvmBuilder->getInt8Ty(), {},false);
+    type = llvm::FunctionType::get(llvmBuilder->getInt8PtrTy(), {},false);
     procedure = llvm::Function::Create(type, llvm::Function::ExternalLinkage, getString.GetId(), llvmModule);
     getString.SetLLVMFunction(procedure);
     AddSymbol(getString);
