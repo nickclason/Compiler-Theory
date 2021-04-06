@@ -1,0 +1,24 @@
+program test is
+    variable a : integer;
+    global variable tmp : bool;
+    global procedure f : integer(variable x : integer)
+        variable b : integer;
+        variable y : integer;
+        procedure globProc : integer()
+            variable localVar : integer;
+            begin
+                return 1;
+        end procedure;
+    begin
+        b := 3;
+        y := b;
+	return x + y * 4;
+    end procedure;
+begin
+    a := 3;
+    a := f(3);
+    tmp := putInteger(a);
+    a := globProc();
+    tmp := putInteger(a);
+
+end program .

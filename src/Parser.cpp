@@ -174,6 +174,7 @@ void Parser::ProgramBody()
 
 void Parser::InitLLVM()
 {
+
     std::string outFile = "output/IR.ll";
     std::error_code error_code;
     llvm::raw_fd_ostream out(outFile, error_code, llvm::sys::fs::F_None);
@@ -513,24 +514,28 @@ void Parser::ProcedureDeclaration(Symbol &procedure) {
     ProcedureHeader(procedure);
 
     std::vector<llvm::Type *> parameters;
-    for (const Symbol& param : procedure.GetParameters()) {
-        if (param.IsArray()) {
+    for (const Symbol& param : procedure.GetParameters())
+    {
+        if (param.IsArray())
+        {
             parameters.push_back(GetLLVMType(param)->getPointerTo());
-        } else {
+        }
+        else
+        {
             parameters.push_back(GetLLVMType(param));
         }
     }
 
     llvm::FunctionType *functionType = llvm::FunctionType::get(GetLLVMType(procedure), parameters, false);
-    llvm::FunctionCallee procCallee = llvmModule->getOrInsertFunction("proc_" + std::to_string(procedureCount),
-                                                                      functionType);
+    llvm::FunctionCallee procCallee = llvmModule->getOrInsertFunction("proc_" + std::to_string(procedureCount), functionType);
     auto *proc = llvm::dyn_cast<llvm::Constant>(procCallee.getCallee());
     procedureCount++;
     auto *func = llvm::cast<llvm::Function>(proc);
     func->setCallingConv(llvm::CallingConv::C);
     procedure.SetLLVMFunction(func);
 
-    if (symbolTable.DoesSymbolExist(procedure.GetId())) {
+    if (symbolTable.DoesSymbolExist(procedure.GetId()))
+    {
         ReportError("This identifier already exists");
         return;
     }
@@ -542,7 +547,8 @@ void Parser::ProcedureDeclaration(Symbol &procedure) {
 
     symbolTable.RemoveScope();
 
-    if (symbolTable.GetScopeCount() != 0 && symbolTable.DoesSymbolExist(procedure.GetId())) {
+    if (symbolTable.GetScopeCount() != 0 && symbolTable.DoesSymbolExist(procedure.GetId()))
+    {
         ReportError("This identifier already exists");
         return;
     }
