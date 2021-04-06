@@ -1,9 +1,0 @@
-program test is
-    variable y : integer;
-    variable tmp : bool;
-    variable str : string;
-
-    begin
-        str := getString();
-        tmp := putString(str);
-end program.

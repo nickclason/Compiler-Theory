@@ -3,12 +3,13 @@
 //
 
 // Interesting things about my compiler.
-//  - Tracks unused variables
+//  - Tracks unused variables, this might not actually be possible
 //  - Line and column number error reporting
 //
 
 // TODO: Global arrays don't work properly when operating on entire array.
 //       recursiveFib.src - is not written correctly -- not my fault
+//       Make sure "NOT" works
 
 #include "../include/Parser.h"
 
@@ -234,6 +235,7 @@ void Parser::InitLLVM()
     {
         std::cout << "Compilation was successful" << std::endl;
     }
+
 }
 
 bool Parser::ValidateToken(int tokenType)
@@ -834,14 +836,6 @@ void Parser::AssignmentStatement()
         llvmBuilder->CreateBr(llvmUnwrapHead);
         llvmBuilder->SetInsertPoint(llvmUnwrapEnd);
         unwrap = false;
-
-//        llvm::Value *one_32b = llvm::ConstantInt::getIntegerValue(llvmBuilder->getInt32Ty(), llvm::APInt(32, 1, true));
-//        llvmUnwrapIdx = llvmBuilder->CreateAdd(llvmUnwrapIdx, one_32b);
-//        llvmBuilder->CreateStore(llvmUnwrapIdx, llvmUnwrapIdxAddr);
-//        llvmBuilder->CreateBr(llvmUnwrapHead);
-//
-//        llvmBuilder->SetInsertPoint(llvmUnwrapEnd);
-//        unwrap = false;
     }
 
     dest.SetIsInitialized(true);
@@ -906,7 +900,6 @@ void Parser::IfStatement()
     int terminatorSize = 2;
     WhileStatements(terminators, terminatorSize);
 
-    // std::cout << std::to_string(token->type) << std::endl;
     if (token->type == T_ELSE)
     {
         end = llvm::BasicBlock::Create(llvmContext, "", llvmCurrProc);

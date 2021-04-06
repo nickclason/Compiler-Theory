@@ -43,6 +43,8 @@ private:
     std::vector<std::map<std::string, Symbol> > localScopes;
 
     int scopeCount;
+
+//    void ReportUnusedVars();
 };
 
 #endif //COMPILER_THEORY_SYMBOLTABLE_H
