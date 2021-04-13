@@ -13,12 +13,14 @@ SymbolTable::SymbolTable()
 
 SymbolTable::~SymbolTable()=default;
 
-void SymbolTable::AddScope() {
+void SymbolTable::AddScope()
+{
     localScopes.push_back(std::map<std::string, Symbol>());
     scopeCount++;
 }
 
-void SymbolTable::RemoveScope() {
+void SymbolTable::RemoveScope()
+{
     if (localScopes.size() > 0)
     {
         //ReportUnusedVars(); // Todo: WIP
@@ -33,11 +35,8 @@ void SymbolTable::RemoveScope() {
     scopeCount--;
 }
 
-void SymbolTable::AddSymbol(Symbol &symbol) {
-    // Debug only
-    //std::cout << "\tInserting symbol: ";
-    //symbol.PrintDebugInfo();
-
+void SymbolTable::AddSymbol(Symbol &symbol)
+{
     if (symbol.IsGlobal())
     {
         globalScope[symbol.GetId()] = symbol;
@@ -48,11 +47,13 @@ void SymbolTable::AddSymbol(Symbol &symbol) {
     }
 }
 
-void SymbolTable::SetScopeProc(Symbol proc) {
+void SymbolTable::SetScopeProc(Symbol proc)
+{
     localScopes.back()["_proc"] = proc;
 }
 
-Symbol SymbolTable::GetScopeProc() {
+Symbol SymbolTable::GetScopeProc()
+{
     std::map<std::string, Symbol>::iterator it = localScopes.back().find("_proc");
     if (it != localScopes.back().end())
     {
@@ -66,7 +67,8 @@ Symbol SymbolTable::GetScopeProc() {
     }
 }
 
-bool SymbolTable::DoesSymbolExist(std::string id) {
+bool SymbolTable::DoesSymbolExist(std::string id)
+{
     std::map<std::string, Symbol>::iterator it = localScopes.back().find(id);
     if (it != localScopes.back().end())
     {
@@ -95,10 +97,6 @@ Symbol SymbolTable::FindSymbol(std::string id) {
     std::map<std::string, Symbol>::iterator it = localScopes.back().find(id);
     if (it != localScopes.back().end())
     {
-        // Debug
-        //std::cout << "Found the following symbol:" << std::endl;
-        //it->second.PrintDebugInfo();
-
         return it->second;
     }
 
@@ -112,7 +110,8 @@ Symbol SymbolTable::FindSymbol(std::string id) {
     return symbol;
 }
 
-std::map<std::string, Symbol> SymbolTable::GetLocalScope() {
+std::map<std::string, Symbol> SymbolTable::GetLocalScope()
+{
     return localScopes.back();
 }
 

@@ -32,28 +32,25 @@ private:
     int procedureCount;
     int errorCount;
     int warningCount;
-    int unwrapSize;
+    int unrollSize;
 
 
     bool debug;
-    // bool doCompile;
-    // bool stopParse;
     bool errorFlag;
-    bool unwrap;
-
+    bool doUnroll;
     llvm::Module *llvmModule;
     llvm::IRBuilder<> *llvmBuilder;
     llvm::LLVMContext llvmContext;
     llvm::Function *llvmCurrProc;
-    llvm::Value *llvmUnwrapIdx;
-    llvm::Value *llvmUnwrapIdxAddr;
-    llvm::BasicBlock *llvmUnwrapHead;
-    llvm::BasicBlock *llvmUnwrapEnd;
+
+    llvm::Value *unrollIdx;
+    llvm::Value *unrollIdxAddress;
+    llvm::BasicBlock *unrollLoopStart;
+    llvm::BasicBlock *unrollLoopEnd;
 
 
     // General/Utility Functions
     bool ValidateToken(int tokenType);
-
     std::string TypeToString(int tokenType);
 
     void PrintDebugInfo(std::string langID);
@@ -66,7 +63,6 @@ private:
     void ReportWarning(std::string msg);
 
     void Resync(int tokens[], int length);
-
 
     // Parsing
     void ProgramHeader();
@@ -89,7 +85,6 @@ private:
     void IfStatement();
     void LoopStatement();
     void ReturnStatement();
-
 
     Symbol IndexArray(Symbol symbol);
     Symbol AssignmentTypeCheck(Symbol dest, Symbol expr, token_t *token);
@@ -115,13 +110,11 @@ private:
     Symbol Factor(Symbol expectedType);
     Symbol Number();
     Symbol String();
-    // Symbol Name();
 
     std::string Identifier();
 
     std::vector<llvm::Value *> ArgumentList(std::vector<Symbol>::iterator curr, std::vector<Symbol>::iterator end);
 
-    // LLVM
     llvm::Type* GetLLVMType(Symbol symbol);
     llvm::Value* ConvertIntToBool(llvm::Value *intVal);
 };

@@ -35,20 +35,20 @@ Parser::Parser(bool debug_, Scanner scanner_, SymbolTable symbolTable_, token_t 
     //stopParse = false;
     //doCompile = true;
     errorFlag = false;
-    unwrap = false;
+    doUnroll = false;
 
     procedureCount = 0;
     errorCount = 0;
     warningCount = 0;
-    unwrapSize = 0;
+    unrollSize = 0;
 
     llvmModule = nullptr;
     llvmBuilder = nullptr;
     llvmCurrProc = nullptr;
-    llvmUnwrapIdx = nullptr;
-    llvmUnwrapIdxAddr = nullptr;
-    llvmUnwrapHead = nullptr;
-    llvmUnwrapEnd = nullptr;
+    unrollIdx = nullptr;
+    unrollIdxAddress = nullptr;
+    unrollLoopStart = nullptr;
+    unrollLoopEnd = nullptr;
 
     Program();
 
@@ -791,6 +791,7 @@ void Parser::Statement() {
     token = scanner.PeekToken();
     if (token->type == T_IDENTIFIER)
     {
+        // It has to be an assignment statement, this is the only valid case after an identifier at this point
         AssignmentStatement();
     }
     else if (token->type == T_IF)
@@ -834,14 +835,15 @@ void Parser::AssignmentStatement()
     dest.SetLLVMValue(expr.GetLLVMValue());
     symbolTable.AddSymbol(dest);
 
-    if (unwrap)
+    if (doUnroll)
     {
         llvm::Value *one = llvm::ConstantInt::getIntegerValue(llvmBuilder->getInt32Ty(), llvm::APInt(32, 1, true));
-        llvmUnwrapIdx = llvmBuilder->CreateAdd(llvmUnwrapIdx, one);
-        llvmBuilder->CreateStore(llvmUnwrapIdx, llvmUnwrapIdxAddr);
-        llvmBuilder->CreateBr(llvmUnwrapHead);
-        llvmBuilder->SetInsertPoint(llvmUnwrapEnd);
-        unwrap = false;
+        unrollIdx = llvmBuilder->CreateAdd(unrollIdx, one);
+        llvmBuilder->CreateStore(unrollIdx, unrollIdxAddress);
+        llvmBuilder->CreateBr(unrollLoopStart);
+        llvmBuilder->SetInsertPoint(unrollLoopEnd);
+        doUnroll = false;
+
     }
 
     dest.SetIsInitialized(true);
@@ -1224,47 +1226,50 @@ Symbol Parser::Destination()
     }
     else
     {
-        // array unwrap/unwind
+        // unroll
         if (dest.IsArray())
         {
+
+            // TODO: Something is wrong for global arrays here
             dest.SetIsArrayIndexed(true);
-            unwrap = true;
-            unwrapSize = dest.GetArraySize();
+            doUnroll = true;
+            unrollSize = dest.GetArraySize();
 
             llvm::Value *zero = llvm::ConstantInt::getIntegerValue(llvmBuilder->getInt32Ty(), llvm::APInt(32, 0, true));
-            llvmUnwrapIdx = zero;
-            llvmUnwrapIdxAddr = llvmBuilder->CreateAlloca(llvmBuilder->getInt32Ty());
-            llvmBuilder->CreateStore(llvmUnwrapIdx, llvmUnwrapIdxAddr);
+            unrollIdx = zero;
+            unrollIdxAddress = llvmBuilder->CreateAlloca(llvmBuilder->getInt32Ty());
+            llvmBuilder->CreateStore(unrollIdx, unrollIdxAddress);
 
-            llvmUnwrapHead = llvm::BasicBlock::Create(llvmContext, "", llvmCurrProc);
-            llvm::BasicBlock *llvmUnwrapBody = llvm::BasicBlock::Create(llvmContext, "", llvmCurrProc);
-            llvmUnwrapEnd = llvm::BasicBlock::Create(llvmContext, "", llvmCurrProc);
+            unrollLoopStart = llvm::BasicBlock::Create(llvmContext, "", llvmCurrProc);
+            llvm::BasicBlock *unrollLoopBody = llvm::BasicBlock::Create(llvmContext, "", llvmCurrProc);
+            unrollLoopEnd = llvm::BasicBlock::Create(llvmContext, "", llvmCurrProc);
 
-            llvmBuilder->CreateBr(llvmUnwrapHead);
-            llvmBuilder->SetInsertPoint(llvmUnwrapHead);
-            llvmUnwrapIdx = llvmBuilder->CreateLoad(llvmBuilder->getInt32Ty(), llvmUnwrapIdxAddr);
+            llvmBuilder->CreateBr(unrollLoopStart);
+            llvmBuilder->SetInsertPoint(unrollLoopStart);
+            unrollIdx = llvmBuilder->CreateLoad(llvmBuilder->getInt32Ty(), unrollIdxAddress);
 
-            llvm::Value *cmp = llvmBuilder->CreateICmpEQ(llvmUnwrapIdx, dest.GetLLVMArraySize());
-            llvmBuilder->CreateCondBr(cmp, llvmUnwrapEnd, llvmUnwrapBody);
-            llvmBuilder->SetInsertPoint(llvmUnwrapBody);
-            llvmUnwrapIdx = llvmBuilder->CreateLoad(llvmBuilder->getInt32Ty(), llvmUnwrapIdxAddr);
+            llvm::Value *cmp = llvmBuilder->CreateICmpEQ(unrollIdx, dest.GetLLVMArraySize());
+            llvmBuilder->CreateCondBr(cmp, unrollLoopEnd, unrollLoopBody);
+            llvmBuilder->SetInsertPoint(unrollLoopBody);
+            unrollIdx = llvmBuilder->CreateLoad(llvmBuilder->getInt32Ty(), unrollIdxAddress);
 
             llvm::Value *addr = nullptr;
             if (dest.IsGlobal())
             {
-                llvm::Value *vals[] = {zero, llvmUnwrapIdx};
+                llvm::Value *vals[] = {zero, unrollIdx};
                 addr = llvmBuilder->CreateInBoundsGEP(dest.GetLLVMArrayAddress(), vals);
             }
             else
             {
-                addr = llvmBuilder->CreateGEP(dest.GetLLVMArrayAddress(), llvmUnwrapIdx);
+                addr = llvmBuilder->CreateGEP(dest.GetLLVMArrayAddress(), unrollIdx);
             }
 
             dest.SetLLVMAddress(addr);
+
         }
     }
 
-    // If we get here, the destination is valid and not an array
+    // If we get here, the destination is valid
     return dest;
 }
 
@@ -1960,22 +1965,23 @@ Symbol Parser::ProcedureCallOrName()
 
             sym = IndexArray(sym);
         }
-        else if (unwrap)
+        else if (doUnroll)
         {
-            // array unwrap/unwind
+            // unroll array
             if (sym.IsArray())
             {
                 sym.SetIsArrayIndexed(true);
-                if (sym.GetArraySize() < unwrapSize)
+                if (sym.GetArraySize() < unrollSize)
                 {
-                    ReportError("Array size is smaller than destination size. Unwrap failed.");
+                    ReportError("Array size is smaller than destination size. Unroll failed.");
                     sym = Symbol();
                     sym.SetIsValid(false);
                     return sym;
                 }
 
-                llvm::Value *addr = llvmBuilder->CreateGEP(sym.GetLLVMArrayAddress(), llvmUnwrapIdx);
+                llvm::Value *addr = llvmBuilder->CreateGEP(sym.GetLLVMArrayAddress(), unrollIdx);
                 sym.SetLLVMAddress(addr);
+
             }
         }
         else
