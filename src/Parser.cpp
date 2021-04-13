@@ -1229,8 +1229,6 @@ Symbol Parser::Destination()
         // unroll
         if (dest.IsArray())
         {
-
-            // TODO: Something is wrong for global arrays here
             dest.SetIsArrayIndexed(true);
             doUnroll = true;
             unrollSize = dest.GetArraySize();
@@ -2001,7 +1999,7 @@ Symbol Parser::ProcedureCallOrName()
 
             if (sym.IsArray() && !sym.IsArrayIndexed())
             {
-                // TODO: copy array into the val?
+                // TODO: copy array into the val? probably not
                 std::cout << "not sure if this is a problem... leaving it for now..." << std::endl;
             }
             else

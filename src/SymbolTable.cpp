@@ -19,22 +19,6 @@ void SymbolTable::AddScope()
     scopeCount++;
 }
 
-void SymbolTable::RemoveScope()
-{
-    if (localScopes.size() > 0)
-    {
-        //ReportUnusedVars(); // Todo: WIP
-        localScopes.pop_back();
-    }
-    else
-    {
-        std::cout << "Error: No scope to remove" << std::endl;
-    }
-
-
-    scopeCount--;
-}
-
 void SymbolTable::AddSymbol(Symbol &symbol)
 {
     if (symbol.IsGlobal())
@@ -250,14 +234,3 @@ int SymbolTable::GetScopeCount()
 {
     return scopeCount;
 }
-
-//void SymbolTable::ReportUnusedVars()
-//{
-//    for (auto &it : GetLocalScope())
-//    {
-//        if (!it.second.IsUsed() && it.first != "_proc")
-//        {
-//            std::cout << "Warning: Variable " << it.second.GetId() << " is declared but never used" << std::endl;
-//        }
-//    }
-//}
