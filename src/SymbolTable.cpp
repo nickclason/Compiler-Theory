@@ -19,6 +19,22 @@ void SymbolTable::AddScope()
     scopeCount++;
 }
 
+void SymbolTable::RemoveScope()
+{
+    if (localScopes.size() > 0)
+    {
+        //ReportUnusedVars(); // Todo: WIP
+        localScopes.pop_back();
+    }
+    else
+    {
+        std::cout << "Error: No scope to remove" << std::endl;
+    }
+
+
+    scopeCount--;
+}
+
 void SymbolTable::AddSymbol(Symbol &symbol)
 {
     if (symbol.IsGlobal())
