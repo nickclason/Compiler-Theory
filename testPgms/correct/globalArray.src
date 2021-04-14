@@ -1,5 +1,6 @@
 program test is
     global variable arr : integer[3];
+    global variable arr2 : integer[3];
     variable i : integer;
     variable tmp : bool;
 
@@ -30,4 +31,20 @@ begin
     tmp := putString("");
 
     i := test();
+
+    arr2[0] := 1;
+    arr2[1] := 2;
+    arr2[2] := 3;
+
+    for (i := 0; i < 3)
+        arr2[i] := arr2[i] * 2;
+        i := i + 1;
+    end for;
+
+    tmp := putString("");
+
+     for (i := 0; i < 3)
+         tmp := putInteger(arr2[i]);
+         i := i + 1;
+     end for;
 end program .

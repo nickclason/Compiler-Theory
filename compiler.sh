@@ -1,4 +1,5 @@
 #!/bin/bash
-output/compiler
+output/compiler "$@"
 gcc output/output.o src/runtime.c -o a.out
+
 

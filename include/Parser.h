@@ -30,7 +30,6 @@ private:
     int warningCount;
     int unrollSize;
 
-
     bool debug;
     bool errorFlag;
     bool doUnroll;
@@ -49,12 +48,12 @@ private:
     bool ValidateToken(int tokenType);
     std::string TypeToString(int tokenType);
 
-    void PrintDebugInfo(std::string langID);
+    void LanguageDebug(std::string langID);
 
     void ReportError(std::string msg);
     void ReportMissingTokenError(std::string expected);
     void ReportTypeMismatchError(std::string expected, std::string actual);
-    void ReportOpTypeCheckError(std::string op, std::string type1, std::string type2);
+    void ReportIncompatibleTypeError(std::string op, std::string type1, std::string type2);
 
     void ReportWarning(std::string msg);
 
@@ -65,8 +64,8 @@ private:
     void ProgramBody();
 
     void Declaration();
-    void WhileDeclarations();
-    void WhileStatements(int terminators[], int terminatorsSize);
+    void Declarations();
+    void Statements(int terminators[], int terminatorsSize);
     void ProcedureDeclaration(Symbol &procedure);
     void ProcedureHeader(Symbol &procedure);
     void ParameterList(Symbol &procedure);

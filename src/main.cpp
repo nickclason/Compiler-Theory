@@ -54,9 +54,15 @@ void PeekTest(std::string fileName)
     }
 }
 
-int main()
+int main(int argc, char* argv[])
 {
-    std::string fileName = GetFileName();
+    if (argc < 2)
+    {
+        std::cout << "No file found" << std::endl;
+        return 0;
+    }
+
+    std::string fileName = argv[1];
     Scanner scanner;
     SymbolTable symbolTable;
 
@@ -64,7 +70,17 @@ int main()
     scanner.InitScanner(fileName);
     token_t *token = new token_t();
 
-    Parser *p = new Parser(false, scanner, symbolTable, token);
+    bool debug = false;
+    if (argc > 2)
+    {
+        if (std::string(argv[2]).compare("--debug") == 0 ||
+            std::string(argv[2]).compare("-d") == 0)
+        {
+            debug = true;
+        }
+    }
+
+    Parser *p = new Parser(debug, scanner, symbolTable, token);
 
     return 0;
 }
