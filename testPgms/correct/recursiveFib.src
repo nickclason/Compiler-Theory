@@ -20,9 +20,12 @@ procedure Fib : integer(variable val :integer)
 		return 1;
 	end if;
 
-	//return val + Fib(Sub(val)); // this is not the correct logic
+    // This is what it currently is
+	//return val + Fib(Sub(val));
 
+    // I believe this gives the correct sequence
 	return Fib(Sub(val)) + Fib(Sub(Sub(val)));
+
 end procedure;
 
 

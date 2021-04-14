@@ -172,7 +172,7 @@ void Parser::ProgramBody()
         }
         symbolTable.AddSymbol(it.second);
     }
-    */
+*/
 
     // Get all statements
     int terminators[] = { T_END };
@@ -2221,7 +2221,7 @@ std::vector<llvm::Value *> Parser::ArgumentList(std::vector<Symbol>::iterator cu
 {
     LanguageDebug("<argument_list>");
 
-    bool continue_ = false;
+    bool continue_ = true;
     std::vector<llvm::Value *> arguments;
     /*
     do {
