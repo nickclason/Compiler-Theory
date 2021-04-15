@@ -4,7 +4,8 @@
 
 // TODO: Global arrays don't work properly when operating on entire array.
 // Something is wrong in logicals.src now... else condition doesnt work on strings???..single character strings???
-// get rid of getllvmtype because of the fucking idiot that is just copying
+// todo: get rid of getllvmtype because of the fucking idiot that is just copying
+// todo: refactor runtime
 
 #include "../include/Parser.h"
 
@@ -860,6 +861,7 @@ void Parser::AssignmentStatement()
 }
 
 // <if_statement>
+/*
 void Parser::IfStatement()
 {
     if (!ValidateToken(T_IF))
@@ -928,10 +930,10 @@ void Parser::IfStatement()
         {
             llvmBuilder->CreateBr(end);
         }
-        else
-        {
-            llvmBuilder->SetInsertPoint(false_);
-        }
+//        else
+//        {
+        llvmBuilder->SetInsertPoint(false_);
+//        }
 
         // false_ block statements
         int endElse[] = {T_END};
@@ -974,6 +976,119 @@ void Parser::IfStatement()
         {
             llvmBuilder->SetInsertPoint(end);
         }
+    }
+}
+*/
+
+// <if_statement>
+void Parser::IfStatement()
+{
+    if (!ValidateToken(T_IF))
+    {
+        ReportMissingTokenError("IF");
+    }
+
+    if (!ValidateToken(T_LPAREN))
+    {
+        ReportMissingTokenError("(");
+        return;
+    }
+
+    // Get expression
+    Symbol expected = Symbol();
+    expected.SetType(T_BOOL);
+    Symbol expr = Expression(expected);
+
+    // Do type conversion on compatible types
+    if (expr.GetType() == T_INTEGER)
+    {
+        ReportWarning("Converting integer to boolean");
+        llvm::Value *val = ConvertIntToBool(expr.GetLLVMValue());
+        expr.SetLLVMValue(val);
+    }
+    else if (expr.GetType() != T_BOOL)
+    {
+        ReportError("If statement must evaluate to bool (or int)");
+        return;
+    }
+
+    if (!ValidateToken(T_RPAREN))
+    {
+        ReportMissingTokenError(")");
+        return;
+    }
+
+    if (!ValidateToken(T_THEN))
+    {
+        ReportMissingTokenError("THEN");
+        return;
+    }
+
+    // Create blocks for true and false
+    llvm::BasicBlock *true_ = nullptr;
+    llvm::BasicBlock *false_ = nullptr;
+    llvm::BasicBlock *end = nullptr;
+
+    true_ = llvm::BasicBlock::Create(llvmContext, "", llvmCurrProc);
+    false_ = llvm::BasicBlock::Create(llvmContext, "", llvmCurrProc);
+
+    // Conditional jump that is based on the expression
+    llvmBuilder->CreateCondBr(expr.GetLLVMValue(), true_, false_);
+    llvmBuilder->SetInsertPoint(true_);
+
+    // true_ block statements
+    int terminators[] = {T_ELSE, T_END};
+    int terminatorSize = 2;
+    Statements(terminators, terminatorSize);
+
+    if (token->type == T_ELSE)
+    {
+        end = llvm::BasicBlock::Create(llvmContext, "", llvmCurrProc);
+
+        if (llvmBuilder->GetInsertBlock()->getTerminator() == nullptr)
+        {
+            llvmBuilder->CreateBr(end);
+        }
+
+        llvmBuilder->SetInsertPoint(false_);
+
+        // false_ block statements
+        int endElse[] = {T_END};
+        terminatorSize = 1;
+        Statements(endElse, terminatorSize);
+    }
+
+    if (token->type != T_END)
+    {
+        ReportMissingTokenError("END");
+        return;
+    }
+
+    if (!ValidateToken(T_IF))
+    {
+        ReportMissingTokenError("IF");
+        return;
+    }
+
+    if (end == nullptr)
+    {
+        // go from true_ to false_
+        if (llvmBuilder->GetInsertBlock()->getTerminator() == nullptr)
+        {
+            llvmBuilder->CreateBr(false_);
+        }
+
+        llvmBuilder->SetInsertPoint(false_);
+    }
+    else
+    {
+        // go from false_ to end
+        if (llvmBuilder->GetInsertBlock()->getTerminator() == nullptr)
+        {
+            llvmBuilder->CreateBr(end);
+        }
+
+        llvmBuilder->SetInsertPoint(end);
     }
 }
 
@@ -1745,15 +1860,15 @@ Symbol Parser::RelationTypeCheck(Symbol expectedType, Symbol term, Symbol relati
 
             // Get the character
             llvm::Value *termAddr = llvmBuilder->CreateGEP(term.GetLLVMValue(), idx);
-            llvm::Value *termChar = llvmBuilder->CreateLoad(llvmBuilder->getInt8Ty(), termAddr);
+            llvm::Value *termChar = llvmBuilder->CreateLoad(llvmBuilder->getInt8PtrTy(), termAddr);
             llvm::Value *tailAddr = llvmBuilder->CreateGEP(relation_.GetLLVMValue(), idx);
-            llvm::Value *tailChar = llvmBuilder->CreateLoad(llvmBuilder->getInt8Ty(), tailAddr);
+            llvm::Value *tailChar = llvmBuilder->CreateLoad(llvmBuilder->getInt8PtrTy(), tailAddr);
 
             // Do the comparison
             llvm::Value *cmp = llvmBuilder->CreateICmpEQ(termChar, tailChar);
 
             // check that strings are still going
-            llvm::Value *zero = llvm::ConstantInt::getIntegerValue(llvmBuilder->getInt8Ty(), llvm::APInt(8, 0, true));
+            llvm::Value *zero = llvm::ConstantInt::getIntegerValue(llvmBuilder->getInt8PtrTy(), llvm::APInt(8, 0, true));
             llvm::Value *noEnd = llvmBuilder->CreateICmpNE(termChar, zero);
             llvm::Value *cont = llvmBuilder->CreateAnd(cmp, noEnd);
 

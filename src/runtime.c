@@ -75,6 +75,7 @@ char* GETSTRING()
         string[strlen(string) - 1] = '\0';
     }
     return string;
+
 }
 
 float SQRT(int num)

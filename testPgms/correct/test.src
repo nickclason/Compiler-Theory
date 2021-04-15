@@ -1,28 +1,23 @@
 program test is
-    variable x : string[3];
-    variable i : integer;
-    variable tmp : bool;
 
-    variable one : integer;
-    variable two : float;
+global variable x : bool;
+global variable c : string;
+global variable tmp : bool;
 
 begin
 
-    //x[0] := "Hello, World!";
-    //x[1] := "ABC";
-    //x[2] := "Nick Clason";
-//
-    //for (i := 0; i < 3)
-    //    tmp := putString(x[i]);
-    //    i := i+1;
-    //end for;
+x := getBool();
+if(x) then
+	tmp := putString("T");
+else
+	tmp := putString("F");
+end if;
 
-    one := 1.5;
-    two := 1.8723;
+c := "apple";
+if(c == "Apple") then
+	tmp := putString("T");
+else
+	tmp := putString("F");
+end if;
 
-    //two := one;
-
-    tmp := putInteger(one);
-    tmp := putFloat(two);
-
-end program .
+end program.
