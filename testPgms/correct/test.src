@@ -3,15 +3,26 @@ program test is
     variable i : integer;
     variable tmp : bool;
 
+    variable one : integer;
+    variable two : float;
+
 begin
 
-    x[0] := "Hello, World!";
-    x[1] := "ABC";
-    x[2] := "Nick Clason";
+    //x[0] := "Hello, World!";
+    //x[1] := "ABC";
+    //x[2] := "Nick Clason";
+//
+    //for (i := 0; i < 3)
+    //    tmp := putString(x[i]);
+    //    i := i+1;
+    //end for;
 
-    for (i := 0; i < 3)
-        tmp := putString(x[i]);
-        i := i+1;
-    end for;
+    one := 1.5;
+    two := 1.8723;
+
+    //two := one;
+
+    tmp := putInteger(one);
+    tmp := putFloat(two);
 
 end program .

@@ -78,6 +78,9 @@
 #define T_ENUM_DEC       307      // enum declaration
 
 
+#define LLVM_INT
+
+
 // Token Structure
 //
 struct token_t

@@ -70,17 +70,8 @@ int main(int argc, char* argv[])
     scanner.InitScanner(fileName);
     token_t *token = new token_t();
 
-    bool debug = false;
-    if (argc > 2)
-    {
-        if (std::string(argv[2]).compare("--debug") == 0 ||
-            std::string(argv[2]).compare("-d") == 0)
-        {
-            debug = true;
-        }
-    }
 
-    Parser *p = new Parser(debug, scanner, symbolTable, token);
+    Parser *p = new Parser(scanner, symbolTable, token);
 
     return 0;
 }

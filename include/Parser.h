@@ -14,7 +14,7 @@ class Parser
 {
 public:
 
-    Parser(bool debug_, Scanner scanner_, SymbolTable symbolTable_, token_t *token_);
+    Parser(Scanner scanner_, SymbolTable symbolTable_, token_t *token_);
     ~Parser();
 
     void Program();
@@ -47,8 +47,6 @@ private:
     // General/Utility Functions
     bool ValidateToken(int tokenType);
     std::string TypeToString(int tokenType);
-
-    void LanguageDebug(std::string langID);
 
     void ReportError(std::string msg);
     void ReportMissingTokenError(std::string expected);
