@@ -280,7 +280,7 @@ void Parser::ReportError(std::string msg)
 {
     if (errorFlag) return;
 
-    std::cout << "Line: " << token->line << " Col: " << token->col << "\n\t" << msg << std::endl;
+    printf("Line: %d Col: %d \n\t %c", token->line, token->col, msg.c_str());
     errorFlag = true;
     errorCount++;
 }
@@ -290,7 +290,7 @@ void Parser::ReportMissingTokenError(std::string expected)
 {
     if (errorFlag) return;
 
-    std::cout << "Line: " << token->line << " Col: " << token->col << "\n\t" << "Expected token " << expected << std::endl;
+    printf("Line: %d Col: %d \n\tExpected token %c", expected.c_str());
     errorFlag = true;
     errorCount++;
 }
@@ -300,8 +300,7 @@ void Parser::ReportTypeMismatchError(std::string expected, std::string actual)
 {
     if (errorFlag) return;
 
-    std::cout << "Line: " << token->line << " Col: " << token->col << std::endl;
-    std::cout << "\tExpected: " << expected << std::endl << "\tActual: " << actual << std::endl;
+    printf("Line: %d Col: %d\n\tExpected: %c\n\tActual: %c", token->line, token->col, expected.c_str(), actual.c_str());
     errorFlag = true;
     errorCount++;
 }
@@ -311,10 +310,8 @@ void Parser::ReportIncompatibleTypeError(std::string op, std::string type1, std:
 {
     if (errorFlag) return;
 
-    std::cout << "Line:" << token->line << " Col:" << token->col << "\n\t";
-    std::cout << "Incompatible types for " << op << ":" << std::endl;
-    std::cout << "\n\t\tType 1: " << type1 << std::endl;
-    std::cout << "\n\t\tType 2: " << type2 << std::endl << std::endl;
+    printf("Line: %d Col: %d\n\tIncompatible types for %c: \n\n\t\tType 1: %c\n\n\t\tType 2: %c",
+           token->line, token->col, op.c_str(), type1.c_str(), type2.c_str());
     errorFlag = true;
     errorCount++;
 }
@@ -323,8 +320,8 @@ void Parser::ReportIncompatibleTypeError(std::string op, std::string type1, std:
 void Parser::ReportWarning(std::string msg)
 {
     if (errorFlag) return;
-    std::cout << "Line: " << token->line << " Col: " << token->col << "\n\t";
-    std::cout << "Warning: " << msg << std::endl << std::endl;
+
+    printf("Line: %d Col: %d\n\tWarning: %c", token->line, token->col, msg.c_str());
     warningCount++;
 }
 

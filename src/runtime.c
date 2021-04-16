@@ -69,16 +69,26 @@ char* GETSTRING()
     {
         string[strlen(string) - 1] = '\0';
     }
-
-    for (int i = 0; i < strlen(string); i++)
-    {
-        printf("%c", string[i]);
-    }
-    printf("\n");
     return string;
 
 //    char *string = "a"; // TODO: WHY DOES DOING THIS WORK
 //    return string;
+
+
+//    char *buffer;
+//    size_t buf_size = 32;
+//    size_t characters;
+//
+//    buffer = (char *)malloc(buf_size * sizeof(char));
+//    if( buffer == NULL)
+//    {
+//        perror("Unable to allocate buffer");
+//        exit(1);
+//    }
+//
+//    characters = getline(&buffer,&buf_size,stdin);
+//
+//    return buffer;
 
 }
 
