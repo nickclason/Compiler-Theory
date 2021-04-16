@@ -280,7 +280,8 @@ void Parser::ReportError(std::string msg)
 {
     if (errorFlag) return;
 
-    printf("Line: %d Col: %d \n\t %c", token->line, token->col, msg.c_str());
+    printf("\nLine: %d Col: %d\n\t", token->line, token->col);
+    std::cout << msg << std::endl;
     errorFlag = true;
     errorCount++;
 }
@@ -290,7 +291,8 @@ void Parser::ReportMissingTokenError(std::string expected)
 {
     if (errorFlag) return;
 
-    printf("Line: %d Col: %d \n\tExpected token %c", expected.c_str());
+    printf("\nLine: %d Col: %d \n\tExpected token ", token->line, token->col);
+    std::cout << expected << std::endl;
     errorFlag = true;
     errorCount++;
 }
@@ -300,7 +302,9 @@ void Parser::ReportTypeMismatchError(std::string expected, std::string actual)
 {
     if (errorFlag) return;
 
-    printf("Line: %d Col: %d\n\tExpected: %c\n\tActual: %c", token->line, token->col, expected.c_str(), actual.c_str());
+    printf("\nLine: %d Col: %d", token->line, token->col);
+    std::cout << "Expected: " << expected << std::endl;
+    std::cout << "Actual: " << actual << std::endl;
     errorFlag = true;
     errorCount++;
 }
@@ -310,8 +314,10 @@ void Parser::ReportIncompatibleTypeError(std::string op, std::string type1, std:
 {
     if (errorFlag) return;
 
-    printf("Line: %d Col: %d\n\tIncompatible types for %c: \n\n\t\tType 1: %c\n\n\t\tType 2: %c",
-           token->line, token->col, op.c_str(), type1.c_str(), type2.c_str());
+    printf("\nLine: %d Col: %d\n\t", token->line, token->col);
+    std::cout << "Incompatible types for " << op << "\n\n\t\t";
+    std::cout << "Type 1: " << type1 << "\n\n\t\t";
+    std::cout << "Type 2: " << type2 << std::endl;
     errorFlag = true;
     errorCount++;
 }
@@ -321,7 +327,8 @@ void Parser::ReportWarning(std::string msg)
 {
     if (errorFlag) return;
 
-    printf("Line: %d Col: %d\n\tWarning: %c", token->line, token->col, msg.c_str());
+    printf("\nLine: %d Col: %d\n\t", token->line, token->col);
+    std::cout << "Warning: " << msg << std::endl;
     warningCount++;
 }
 
