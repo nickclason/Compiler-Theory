@@ -110,6 +110,7 @@ private:
 
     llvm::Type* GetLLVMType(Symbol symbol);
     llvm::Value* ConvertIntToBool(llvm::Value *intVal);
+    llvm::Value* DoStringComp(Symbol term, Symbol Relation, token_t *op, llvm::Value *val);
 };
 
 #endif //COMPILER_THEORY_PARSER_H
