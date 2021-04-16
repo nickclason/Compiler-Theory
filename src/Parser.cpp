@@ -119,6 +119,7 @@ void Parser::ProgramBody()
     // Get all declarations
     Declarations();
 
+    // Don't call ValidateToken(), because Declarations() has already gotten the next token
     if (token->type != T_BEGIN)
     {
         ReportMissingTokenError("BEGIN");
@@ -138,8 +139,7 @@ void Parser::ProgramBody()
 
     // Get all statements
     int terminators[] = { T_END };
-    int terminatorsSize = 1;
-    Statements(terminators, terminatorsSize);
+    Statements(terminators, 1);
 
     // Don't call ValidateToken(), because Statements() has already gotten the next token
     if (token->type != T_END)
@@ -691,8 +691,7 @@ void Parser::ProcedureBody()
 
     // Get all statements
     int terminators[] = {T_END};
-    int terminatorSize = 1;
-    Statements(terminators, terminatorSize);
+    Statements(terminators, 1);
 
     if (!ValidateToken(T_PROCEDURE))
     {
@@ -925,8 +924,7 @@ void Parser::IfStatement()
 
     // true_ block statements
     int terminators[] = {T_ELSE, T_END};
-    int terminatorSize = 2;
-    Statements(terminators, terminatorSize);
+    Statements(terminators, 2);
 
     if (token->type == T_ELSE)
     {
@@ -941,8 +939,7 @@ void Parser::IfStatement()
 
         // false_ block statements
         int endElse[] = {T_END};
-        terminatorSize = 1;
-        Statements(endElse, terminatorSize);
+        Statements(endElse, 1);
     }
 
     if (token->type != T_END)
@@ -1046,8 +1043,7 @@ void Parser::LoopStatement()
 
     // Get all statements
     int terminators[] = {T_END};
-    int terminatorSize = 1;
-    Statements(terminators, terminatorSize);
+    Statements(terminators, 1);
 
     if (token->type != T_END)
     {
