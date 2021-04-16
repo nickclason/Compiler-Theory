@@ -1840,49 +1840,7 @@ Symbol Parser::RelationTypeCheck(Symbol expectedType, Symbol term, Symbol relati
         llvm::Value *val ;
         if (term.GetType() == T_STRING)
         {
-            // TODO: look into cleaning this up and refactoring...
-            // create a loop to compare strings
-            llvm::Value *idxAddr = llvmBuilder->CreateAlloca(llvmBuilder->getInt32Ty());
-            llvm::Value *idx = llvm::ConstantInt::getIntegerValue(llvmBuilder->getInt32Ty(), llvm::APInt(32, 0, true));
-            llvmBuilder->CreateStore(idx, idxAddr);
-
-            llvm::BasicBlock *strCmpStart = llvm::BasicBlock::Create(llvmContext, "", llvmCurrProc);
-            llvm::BasicBlock *strCmpEnd = llvm::BasicBlock::Create(llvmContext, "", llvmCurrProc);
-
-            // jump to the loop start
-            llvmBuilder->CreateBr(strCmpStart);
-            llvmBuilder->SetInsertPoint(strCmpStart);
-
-            llvm::Value *one = llvm::ConstantInt::getIntegerValue(llvmBuilder->getInt32Ty(), llvm::APInt(32, 1, true));
-            idx = llvmBuilder->CreateLoad(llvmBuilder->getInt32Ty(), idxAddr);
-            idx = llvmBuilder->CreateBinOp(llvm::Instruction::Add, idx, one);
-            llvmBuilder->CreateStore(idx, idxAddr);
-
-            // Get the character
-            llvm::Value *termAddr = llvmBuilder->CreateGEP(term.GetLLVMValue(), idx);
-            llvm::Value *termChar = llvmBuilder->CreateLoad(llvmBuilder->getInt8PtrTy(), termAddr);
-            llvm::Value *tailAddr = llvmBuilder->CreateGEP(relation_.GetLLVMValue(), idx);
-            llvm::Value *tailChar = llvmBuilder->CreateLoad(llvmBuilder->getInt8PtrTy(), tailAddr);
-
-            // Do the comparison
-            llvm::Value *cmp = llvmBuilder->CreateICmpEQ(termChar, tailChar);
-
-            // check that strings are still going
-            llvm::Value *zero = llvm::ConstantInt::getIntegerValue(llvmBuilder->getInt8PtrTy(), llvm::APInt(8, 0, true));
-            llvm::Value *noEnd = llvmBuilder->CreateICmpNE(termChar, zero);
-            llvm::Value *cont = llvmBuilder->CreateAnd(cmp, noEnd);
-
-            llvmBuilder->CreateCondBr(cont, strCmpStart, strCmpEnd);
-            llvmBuilder->SetInsertPoint(strCmpEnd);
-
-            if (op->type == T_EQEQ)
-            {
-                val = cmp;
-            }
-            else
-            {
-                val = llvmBuilder->CreateNot(cmp);
-            }
+            val = DoStringComp(term, relation_, op, val);
         }
         else
         {
@@ -2390,4 +2348,54 @@ llvm::Value *Parser::ConvertIntToBool(llvm::Value *intVal)
     llvm::Value *boolVal = llvmBuilder->CreateSelect(cmp, false_, true_);
 
     return boolVal;
+}
+
+// Helper function for performing string comparisions
+llvm::Value* Parser::DoStringComp(Symbol term, Symbol relation, token_t *op, llvm::Value* val)
+{
+    // TODO: look into cleaning this up and refactoring...
+    // create a loop to compare strings
+    llvm::Value *idxAddr = llvmBuilder->CreateAlloca(llvmBuilder->getInt32Ty());
+    llvm::Value *idx = llvm::ConstantInt::getIntegerValue(llvmBuilder->getInt32Ty(), llvm::APInt(32, 0, true));
+    llvmBuilder->CreateStore(idx, idxAddr);
+
+    llvm::BasicBlock *strCmpStart = llvm::BasicBlock::Create(llvmContext, "", llvmCurrProc);
+    llvm::BasicBlock *strCmpEnd = llvm::BasicBlock::Create(llvmContext, "", llvmCurrProc);
+
+    // jump to the loop start
+    llvmBuilder->CreateBr(strCmpStart);
+    llvmBuilder->SetInsertPoint(strCmpStart);
+
+    llvm::Value *one = llvm::ConstantInt::getIntegerValue(llvmBuilder->getInt32Ty(), llvm::APInt(32, 1, true));
+    idx = llvmBuilder->CreateLoad(llvmBuilder->getInt32Ty(), idxAddr);
+    idx = llvmBuilder->CreateBinOp(llvm::Instruction::Add, idx, one);
+    llvmBuilder->CreateStore(idx, idxAddr);
+
+    // Get the character
+    llvm::Value *termAddr = llvmBuilder->CreateGEP(term.GetLLVMValue(), idx);
+    llvm::Value *termChar = llvmBuilder->CreateLoad(llvmBuilder->getInt8PtrTy(), termAddr);
+    llvm::Value *tailAddr = llvmBuilder->CreateGEP(relation.GetLLVMValue(), idx);
+    llvm::Value *tailChar = llvmBuilder->CreateLoad(llvmBuilder->getInt8PtrTy(), tailAddr);
+
+    // Do the comparison
+    llvm::Value *cmp = llvmBuilder->CreateICmpEQ(termChar, tailChar);
+
+    // check that strings are still going
+    llvm::Value *zero = llvm::ConstantInt::getIntegerValue(llvmBuilder->getInt8PtrTy(), llvm::APInt(8, 0, true));
+    llvm::Value *noEnd = llvmBuilder->CreateICmpNE(termChar, zero);
+    llvm::Value *cont = llvmBuilder->CreateAnd(cmp, noEnd);
+
+    llvmBuilder->CreateCondBr(cont, strCmpStart, strCmpEnd);
+    llvmBuilder->SetInsertPoint(strCmpEnd);
+
+    if (op->type == T_EQEQ)
+    {
+        val = cmp;
+    }
+    else
+    {
+        val = llvmBuilder->CreateNot(cmp);
+    }
+
+    return val;
 }

@@ -79,6 +79,7 @@ private:
     void LoopStatement();
     void ReturnStatement();
 
+    // I made these all void...
     Symbol IndexArray(Symbol symbol);
     Symbol AssignmentTypeCheck(Symbol dest, Symbol expr, token_t *token);
 
@@ -110,6 +111,7 @@ private:
 
     llvm::Type* GetLLVMType(Symbol symbol);
     llvm::Value* ConvertIntToBool(llvm::Value *intVal);
+    llvm::Value* DoStringComp(Symbol term, Symbol Relation, token_t *op, llvm::Value *val);
 };
 
 #endif //COMPILER_THEORY_PARSER_H
