@@ -59,13 +59,7 @@ bool PUTSTRING(char *str)
 
 char* GETSTRING()
 {
-//    int max = 256;
-//    char *str = malloc(max * sizeof(char));
-//    fgets(str, max, stdin);
-//    if ((strlen(str) > 0) && (str[strlen(str) - 1] == '\n')) {
-//        str[strlen(str) - 1] = '\0';
-//    }
-//    return str;
+
 
     int max_length = 256;
     char *string = malloc(max_length * sizeof(char));
@@ -74,7 +68,16 @@ char* GETSTRING()
     if ((strlen(string) > 0) && (string[strlen(string) - 1] == '\n')) {
         string[strlen(string) - 1] = '\0';
     }
+
+    for (int i = 0; i < strlen(string); i++)
+    {
+        printf("%c", string[i]);
+    }
+    printf("\n");
     return string;
+
+//    char *string = "a"; // TODO: WHY DOES DOING THIS WORK
+//    return string;
 
 }
 

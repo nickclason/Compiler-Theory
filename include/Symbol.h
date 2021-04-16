@@ -66,6 +66,8 @@ public:
     llvm::Function *GetLLVMFunction() const;
     void SetLLVMFunction(llvm::Function *llvmFunction);
 
+    void CopySymbol(Symbol toCopy);
+
 private:
 
     std::string id;

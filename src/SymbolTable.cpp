@@ -210,15 +210,34 @@ void SymbolTable::AddIOFunctions(llvm::Module *llvmModule, llvm::LLVMContext &ll
     putString.SetLLVMFunction(procedure);
     AddSymbol(putString);
 
-    Symbol getString;
-    getString.SetId("GETSTRING");
-    getString.SetType(T_STRING);
-    getString.SetIsGlobal(true);
-    getString.SetDeclarationType(T_PROCEDURE);
-    type = llvm::FunctionType::get(llvmBuilder->getInt8PtrTy(), {},false);
-    procedure = llvm::Function::Create(type, llvm::Function::ExternalLinkage, getString.GetId(), llvmModule);
-    getString.SetLLVMFunction(procedure);
-    AddSymbol(getString);
+//    Symbol getString;
+//    getString.SetId("GETSTRING");
+//    getString.SetType(T_STRING);
+//    getString.SetIsGlobal(true);
+//    getString.SetDeclarationType(T_PROCEDURE);
+//    type = llvm::FunctionType::get(llvmBuilder->getInt8PtrTy(), {},false);
+//    procedure = llvm::Function::Create(type, llvm::Function::ExternalLinkage, getString.GetId(), llvmModule);
+//    getString.SetLLVMFunction(procedure);
+//    AddSymbol(getString);
+
+    Symbol get_string;
+    get_string.SetId("GETSTRING");
+    get_string.SetType(T_STRING);
+    get_string.SetIsGlobal(true);
+    get_string.SetDeclarationType(T_PROCEDURE);
+
+    llvm::FunctionType *function_type = llvm::FunctionType::get(
+            llvmBuilder->getInt8PtrTy(),
+            {},
+            false);
+    procedure = llvm::Function::Create(
+            function_type,
+            llvm::Function::ExternalLinkage,
+            get_string.GetId(),
+            llvmModule);
+    get_string.SetLLVMFunction(procedure);
+
+    AddSymbol(get_string);
 
     Symbol sqrt;
     sqrt.SetId("SQRT");

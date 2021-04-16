@@ -79,30 +79,30 @@ private:
     void LoopStatement();
     void ReturnStatement();
 
-    Symbol IndexArray(Symbol symbol);
-    Symbol AssignmentTypeCheck(Symbol dest, Symbol expr, token_t *token);
+    void IndexArray(Symbol symbol, Symbol &out);
+    void AssignmentTypeCheck(Symbol dest, Symbol expr, token_t *token, Symbol &out);
 
-    Symbol ProcedureCallOrName();
+    void ProcedureCallOrName(Symbol &out);
     Symbol Destination();
 
-    Symbol Expression(Symbol expectedType);
-    Symbol Expression_(Symbol expectedType);
-    Symbol ExpressionTypeCheck(Symbol expectedType, Symbol arithOp, Symbol expr_, token_t *op, bool isNotOp);
+    void Expression(Symbol expectedType, Symbol &out);
+    void Expression_(Symbol expectedType, Symbol &out);
+    void ExpressionTypeCheck(Symbol expectedType, Symbol arithOp, Symbol expr_, token_t *op, bool isNotOp, Symbol &out);
 
-    Symbol ArithOp(Symbol expectedType);
-    Symbol ArithOp_(Symbol expectedType);
-    Symbol ArithOpTypeCheck(Symbol expectedType, Symbol rel, Symbol arithOp_, token_t *op);
+    void ArithOp(Symbol expectedType, Symbol &out);
+    void ArithOp_(Symbol expectedType, Symbol &out);
+    void ArithOpTypeCheck(Symbol expectedType, Symbol rel, Symbol arithOp_, token_t *op, Symbol &out);
 
-    Symbol Relation(Symbol expectedType);
-    Symbol Relation_(Symbol expectedType);
-    Symbol RelationTypeCheck(Symbol expectedType, Symbol term, Symbol relation_, token_t *op);
+    void Relation(Symbol expectedType, Symbol &out);
+    void Relation_(Symbol expectedType, Symbol &out);
+    void RelationTypeCheck(Symbol expectedType, Symbol term, Symbol relation_, token_t *op, Symbol &out);
 
-    Symbol Term(Symbol expectedType);
-    Symbol Term_(Symbol expectedType);
+    void Term(Symbol expectedType, Symbol &out);
+    void Term_(Symbol expectedType, Symbol &out);
 
-    Symbol Factor(Symbol expectedType);
-    Symbol Number();
-    Symbol String();
+    void Factor(Symbol expectedType, Symbol &out);
+    void Number(Symbol &out);
+    void String(Symbol &out);
 
     std::string Identifier();
 

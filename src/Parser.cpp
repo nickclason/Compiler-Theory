@@ -747,7 +747,9 @@ void Parser::Bound(Symbol &symbol)
         return;
     }
 
-    Symbol bound = Number();
+    Symbol bound = Symbol();
+    Number(bound);
+
     int size = token->val.intValue;
     symbol.SetArraySize(size);
 }
@@ -833,8 +835,9 @@ void Parser::AssignmentStatement()
     }
 
     // Right hand side
-    Symbol expr = Expression(dest);
-    expr = AssignmentTypeCheck(dest, expr, token);
+    Symbol expr = Symbol();
+    Expression(dest, expr);
+    AssignmentTypeCheck(dest, expr, token, expr);
 
     if (!expr.IsValid()) { return; }
 
@@ -857,128 +860,7 @@ void Parser::AssignmentStatement()
     // Update
     dest.SetIsInitialized(true);
     symbolTable.AddSymbol(dest); // Update
-
 }
-
-// <if_statement>
-/*
-void Parser::IfStatement()
-{
-    if (!ValidateToken(T_IF))
-    {
-        ReportMissingTokenError("IF");
-    }
-
-    if (!ValidateToken(T_LPAREN))
-    {
-        ReportMissingTokenError("(");
-        return;
-    }
-
-    // Get expression
-    Symbol expected = Symbol();
-    expected.SetType(T_BOOL);
-    Symbol expr = Expression(expected);
-
-    // Do type conversion on compatible types
-    if (expr.GetType() == T_INTEGER)
-    {
-        ReportWarning("Converting integer to boolean");
-        llvm::Value *val = ConvertIntToBool(expr.GetLLVMValue());
-        expr.SetLLVMValue(val);
-    }
-    else if (expr.GetType() != T_BOOL)
-    {
-        ReportError("If statement must evaluate to bool (or int)");
-        return;
-    }
-
-    if (!ValidateToken(T_RPAREN))
-    {
-        ReportMissingTokenError(")");
-        return;
-    }
-
-    if (!ValidateToken(T_THEN))
-    {
-        ReportMissingTokenError("THEN");
-        return;
-    }
-
-    // Create blocks for true and false
-    llvm::BasicBlock *true_ = nullptr;
-    llvm::BasicBlock *false_ = nullptr;
-    llvm::BasicBlock *end = nullptr;
-
-    true_ = llvm::BasicBlock::Create(llvmContext, "", llvmCurrProc);
-    false_ = llvm::BasicBlock::Create(llvmContext, "", llvmCurrProc);
-
-    // Conditional jump that is based on the expression
-    llvmBuilder->CreateCondBr(expr.GetLLVMValue(), true_, false_);
-    llvmBuilder->SetInsertPoint(true_);
-
-    // true_ block statements
-    int terminators[] = {T_ELSE, T_END};
-    int terminatorSize = 2;
-    Statements(terminators, terminatorSize);
-
-    if (token->type == T_ELSE)
-    {
-        end = llvm::BasicBlock::Create(llvmContext, "", llvmCurrProc);
-
-        if (llvmBuilder->GetInsertBlock()->getTerminator() == nullptr)
-        {
-            llvmBuilder->CreateBr(end);
-        }
-//        else
-//        {
-        llvmBuilder->SetInsertPoint(false_);
-//        }
-
-        // false_ block statements
-        int endElse[] = {T_END};
-        terminatorSize = 1;
-        Statements(endElse, terminatorSize);
-    }
-
-    if (token->type != T_END)
-    {
-        ReportMissingTokenError("END");
-        return;
-    }
-
-    if (!ValidateToken(T_IF))
-    {
-        ReportMissingTokenError("IF");
-        return;
-    }
-
-    if (end == nullptr)
-    {
-        // go from true_ to false_
-        if (llvmBuilder->GetInsertBlock()->getTerminator() == nullptr)
-        {
-            llvmBuilder->CreateBr(false_);
-        }
-        else
-        {
-            llvmBuilder->SetInsertPoint(false_);
-        }
-    }
-    else
-    {
-        // go from false_ to end
-        if (llvmBuilder->GetInsertBlock()->getTerminator() == nullptr)
-        {
-            llvmBuilder->CreateBr(end);
-        }
-        else
-        {
-            llvmBuilder->SetInsertPoint(end);
-        }
-    }
-}
-*/
 
 // <if_statement>
 void Parser::IfStatement()
@@ -997,7 +879,8 @@ void Parser::IfStatement()
     // Get expression
     Symbol expected = Symbol();
     expected.SetType(T_BOOL);
-    Symbol expr = Expression(expected);
+    Symbol expr = Symbol();
+    Expression(expected, expr);
 
     // Do type conversion on compatible types
     if (expr.GetType() == T_INTEGER)
@@ -1131,7 +1014,8 @@ void Parser::LoopStatement()
     // Condition should be a boolean
     Symbol expected = Symbol();
     expected.SetType(T_BOOL);
-    Symbol expr = Expression(expected);
+    Symbol expr = Symbol();
+    Expression(expected, expr);
 
     // Do type conversion if alllowed
     if (expr.GetType() == T_INTEGER)
@@ -1199,13 +1083,15 @@ void Parser::ReturnStatement()
         llvm::Constant *retVal = llvm::ConstantInt::getIntegerValue(llvmBuilder->getInt32Ty(),
                                                                     llvm::APInt(32, 0, true));
         llvmBuilder->CreateRet(retVal);
-        Symbol expr = Expression(proc);
+        Symbol expr = Symbol();
+        Expression(proc, expr);
         return;
     }
 
     // Get expression
-    Symbol expr = Expression(proc);
-    expr = AssignmentTypeCheck(proc, expr, token);
+    Symbol expr = Symbol();
+    Expression(proc, expr);
+    AssignmentTypeCheck(proc, expr, token, expr);
     if (!expr.IsValid()) {
         return;
     }
@@ -1215,7 +1101,7 @@ void Parser::ReturnStatement()
 }
 
 // Index the symbol passed in
-Symbol Parser::IndexArray(Symbol symbol)
+void Parser::IndexArray(Symbol symbol, Symbol &out)
 {
     symbol.SetIsArrayIndexed(true);
     Symbol sym = Symbol();
@@ -1224,28 +1110,35 @@ Symbol Parser::IndexArray(Symbol symbol)
     if (token->type == T_LBRACKET)
     {
         sym.SetType(T_INTEGER);
-        Symbol idx = Expression(sym);
-        idx = AssignmentTypeCheck(sym, idx, token);
+        Symbol idx = Symbol();
+        Expression(sym, idx);
+        AssignmentTypeCheck(sym, idx, token, idx);
 
         if (idx.GetType() != T_INTEGER)
         {
             ReportError("Array index must be an integer.");
             symbol.SetIsValid(false);
-            return symbol;
+
+            out.CopySymbol(symbol);
+            return;
         }
 
         if (!symbol.IsArray())
         {
             ReportError("Indexing not supported for non-arrays");
             symbol.SetIsValid(false);
-            return symbol;
+
+            out.CopySymbol(symbol);
+            return;
         }
 
         if (!ValidateToken(T_RBRACKET))
         {
             ReportMissingTokenError("]");
             symbol.SetIsValid(false);
-            return symbol;
+
+            out.CopySymbol(symbol);
+            return;
         }
 
         // Make sure that the index is within the array bound
@@ -1285,23 +1178,26 @@ Symbol Parser::IndexArray(Symbol symbol)
 
         symbol.SetLLVMAddress(address);
 
-        return symbol;
+        out.CopySymbol(symbol);
+        return;
     }
 
     ReportMissingTokenError("[");
     sym.SetIsValid(false);
 
-    return sym;
+    out.CopySymbol(symbol);
+    return;
 }
 
 // This function checks that the destination and expression evaluate to the same type,
 // or interoperable types, and does any type conversions if necessary. Converting from one type to another
 // will yield a warning to user.
-Symbol Parser::AssignmentTypeCheck(Symbol dest, Symbol expr, token_t *token)
+void Parser::AssignmentTypeCheck(Symbol dest, Symbol expr, token_t *token, Symbol &out)
 {
     if (dest.GetType() == expr.GetType())
     {
-        return expr;
+        out.CopySymbol(expr);
+        return;
     }
 
     bool isDiff = true;
@@ -1351,11 +1247,12 @@ Symbol Parser::AssignmentTypeCheck(Symbol dest, Symbol expr, token_t *token)
     {
         ReportTypeMismatchError(TypeToString(dest.GetType()), TypeToString(expr.GetType()));
         expr.SetIsValid(false);
-        return expr;
+        out.CopySymbol(expr);
+        return;
     }
 
     // By this point any compatible types should have been converted
-    return expr;
+    out.CopySymbol(expr);
 }
 
 // <destination>
@@ -1367,6 +1264,7 @@ Symbol Parser::Destination()
     if (!dest.IsValid())
     {
         ReportError("Symbol: " + id + " not found");
+//        out.CopySymbol(dest);
         return dest;
     }
 
@@ -1375,13 +1273,15 @@ Symbol Parser::Destination()
         ReportError("Variable required for valid destination");
         dest = Symbol();
         dest.SetIsValid(false);
+
+//        out.CopySymbol(dest);
         return dest;
     }
 
     // Index was supplied, index the array
     if (ValidateToken(T_LBRACKET))
     {
-        dest = IndexArray(dest);
+        IndexArray(dest, dest);
     }
     else // if it is an array with no index, then we unroll the array to operate on the entire thing
     {
@@ -1436,41 +1336,46 @@ Symbol Parser::Destination()
     }
 
     // If we get here, the destination is valid
+//    out.CopySymbol(dest);
     return dest;
 }
 
 // <expression>
-Symbol Parser::Expression(Symbol expectedType)
+void Parser::Expression(Symbol expectedType, Symbol &out)
 {
     bool isNotOp = ValidateToken(T_NOT) ? true : false;
 
-    Symbol arithOp = ArithOp(expectedType);
+    Symbol arithOp =Symbol();
+    ArithOp(expectedType, arithOp);
     token_t *op = scanner.PeekToken();
-    Symbol expr_ = Expression_(expectedType);
+    Symbol expr_ = Symbol();
+    Expression_(expectedType, expr_);
 
-    return ExpressionTypeCheck(expectedType, arithOp, expr_, op, isNotOp);
+    ExpressionTypeCheck(expectedType, arithOp, expr_, op, isNotOp, out);
 }
 
 // <expression>
-Symbol Parser::Expression_(Symbol expectedType)
+void Parser::Expression_(Symbol expectedType, Symbol &out)
 {
     if (ValidateToken(T_AND) || ValidateToken(T_OR))
     {
-        Symbol arithOp = ArithOp(expectedType);
+        Symbol arithOp = Symbol();
+        ArithOp(expectedType, arithOp);
         token_t *op = scanner.PeekToken();
-        Symbol expr_ = Expression_(expectedType);
+        Symbol expr_ = Symbol();
+        Expression_(expectedType, expr_);
 
-        return ExpressionTypeCheck(expectedType, arithOp, expr_, op, false);
+        ExpressionTypeCheck(expectedType, arithOp, expr_, op, false, out);
+        return;
     }
 
     Symbol sym = Symbol();
     sym.SetIsValid(false);
-
-    return sym;
+    out.CopySymbol(sym);
 }
 
 // Verify expression is valid, types match, do codegen
-Symbol Parser::ExpressionTypeCheck(Symbol expectedType, Symbol arithOp, Symbol expr_, token_t *op, bool isNotOp)
+void Parser::ExpressionTypeCheck(Symbol expectedType, Symbol arithOp, Symbol expr_, token_t *op, bool isNotOp, Symbol &out)
 {
     if (expr_.IsValid())
     {
@@ -1497,15 +1402,16 @@ Symbol Parser::ExpressionTypeCheck(Symbol expectedType, Symbol arithOp, Symbol e
             default:
                 ReportError("Invalid type");
                 sym.SetIsValid(false);
-                return sym;
+                out.CopySymbol(sym);
+                return;
         }
 
         if (!isInterop)
         {
             ReportIncompatibleTypeError(opStr, TypeToString(arithOp.GetType()), TypeToString(expr_.GetType()));
             sym.SetIsValid(false);
-
-            return sym;
+            out.CopySymbol(sym);
+            return;
         }
 
         // Create the appropriate operation
@@ -1532,8 +1438,8 @@ Symbol Parser::ExpressionTypeCheck(Symbol expectedType, Symbol arithOp, Symbol e
             val = llvmBuilder->CreateNot(sym.GetLLVMValue());
             sym.SetLLVMValue(val);
         }
-
-        return sym;
+        out.CopySymbol(sym);
+        return;
     }
     else
     {
@@ -1560,8 +1466,8 @@ Symbol Parser::ExpressionTypeCheck(Symbol expectedType, Symbol arithOp, Symbol e
                 ReportIncompatibleTypeError("binary", TypeToString(arithOp.GetType()), "null");
                 Symbol sym = Symbol();
                 sym.SetIsValid(false);
-
-                return sym;
+                out.CopySymbol(sym);
+                return;
             }
 
             // Create Not operation
@@ -1570,40 +1476,47 @@ Symbol Parser::ExpressionTypeCheck(Symbol expectedType, Symbol arithOp, Symbol e
         }
 
         // expr_ was not valid, return arithOp
-        return arithOp;
+        out.CopySymbol(arithOp);
+        return;
     }
 }
 
 // <arith_op>
-Symbol Parser::ArithOp(Symbol expectedType)
+void Parser::ArithOp(Symbol expectedType, Symbol &out)
 {
-    Symbol rel = Relation(expectedType);
+    Symbol rel = Symbol();
+    Relation(expectedType, rel);
     token_t *op = scanner.PeekToken();
-    Symbol arithOp_ = ArithOp_(expectedType);
+    Symbol arithOp_ = Symbol();
+    ArithOp_(expectedType, arithOp_);
 
-    return ArithOpTypeCheck(expectedType, rel, arithOp_, op);
+    ArithOpTypeCheck(expectedType, rel, arithOp_, op, out);
 }
 
 // <arith_op>
-Symbol Parser::ArithOp_(Symbol expectedType)
+void Parser::ArithOp_(Symbol expectedType, Symbol &out)
 {
     if (ValidateToken(T_ADD) || ValidateToken(T_SUBTRACT))
     {
-        Symbol rel = Relation(expectedType);
+        Symbol rel = Symbol();
+        Relation(expectedType, rel);
         token_t *op = scanner.PeekToken();
-        Symbol arithOp_ = ArithOp_(expectedType);
+        Symbol arithOp_ = Symbol();
+        ArithOp_(expectedType, arithOp_);
 
-        return ArithOpTypeCheck(expectedType, rel, arithOp_, op);
+        ArithOpTypeCheck(expectedType, rel, arithOp_, op, out);
+        return;
     }
 
     Symbol sym = Symbol();
     sym.SetIsValid(false);
 
-    return sym;
+    out.CopySymbol(sym);
+    return;
 }
 
 // Verify arithOp is valid, types match, do codegen
-Symbol Parser::ArithOpTypeCheck(Symbol expectedType, Symbol rel, Symbol arithOp_, token_t *op)
+void Parser::ArithOpTypeCheck(Symbol expectedType, Symbol rel, Symbol arithOp_, token_t *op, Symbol &out)
 {
     if (arithOp_.IsValid())
     {
@@ -1636,8 +1549,8 @@ Symbol Parser::ArithOpTypeCheck(Symbol expectedType, Symbol rel, Symbol arithOp_
         {
             ReportIncompatibleTypeError("arith", TypeToString(rel.GetType()), TypeToString(arithOp_.GetType()));
             sym.SetIsValid(false);
-
-            return sym;
+            out.CopySymbol(sym);
+            return;
         }
 
         bool isFloatOp = (rel.GetType() == T_FLOAT || arithOp_.GetType() == T_FLOAT);
@@ -1737,27 +1650,31 @@ Symbol Parser::ArithOpTypeCheck(Symbol expectedType, Symbol rel, Symbol arithOp_
             }
         }
 
-        return sym;
+        out.CopySymbol(sym);
+        return;
     }
     else
     {
         // arithOp_ was not valid
-        return rel;
+        out.CopySymbol(rel);
+        return;
     }
 }
 
 // <relation>
-Symbol Parser::Relation(Symbol expectedType)
+void Parser::Relation(Symbol expectedType, Symbol &out)
 {
-    Symbol term = Term(expectedType);
+    Symbol term = Symbol();
+    Term(expectedType, term);
     token_t *op = scanner.PeekToken();
-    Symbol relation_ = Relation_(expectedType);
+    Symbol relation_ = Symbol();
+    Relation_(expectedType, relation_);
 
-    return RelationTypeCheck(expectedType, term, relation_, op);
+    RelationTypeCheck(expectedType, term, relation_, op, out);
 }
 
 // <relation>
-Symbol Parser::Relation_(Symbol expectedType)
+void Parser::Relation_(Symbol expectedType, Symbol &out)
 {
     if (ValidateToken(T_LESSTHAN) ||
         ValidateToken(T_GREATERTHAN) ||
@@ -1766,21 +1683,25 @@ Symbol Parser::Relation_(Symbol expectedType)
         ValidateToken(T_EQEQ) ||
         ValidateToken(T_NOTEQ))
     {
-        Symbol term = Term(expectedType);
+        Symbol term = Symbol();
+        Term(expectedType, term);
         token_t *op = scanner.PeekToken();
-        Symbol relation_ = Relation_(expectedType);
+        Symbol relation_ = Symbol();
+        Relation_(expectedType, relation_);
 
-        return RelationTypeCheck(expectedType, term, relation_, op);
+        RelationTypeCheck(expectedType, term, relation_, op, out);
+        return;
     }
 
     Symbol sym = Symbol();
     sym.SetIsValid(false);
 
-    return sym;
+    out.CopySymbol(sym);
+    return;
 }
 
 // Verify relation is valid, types match, do codegen
-Symbol Parser::RelationTypeCheck(Symbol expectedType, Symbol term, Symbol relation_, token_t *op)
+void Parser::RelationTypeCheck(Symbol expectedType, Symbol term, Symbol relation_, token_t *op, Symbol &out)
 {
     if (relation_.IsValid())
     {
@@ -1834,7 +1755,8 @@ Symbol Parser::RelationTypeCheck(Symbol expectedType, Symbol term, Symbol relati
         {
             ReportIncompatibleTypeError("relational", TypeToString(term.GetType()), TypeToString(relation_.GetType()));
             sym.SetIsValid(false);
-            return sym;
+            out.CopySymbol(sym);
+            return;
         }
 
         llvm::Value *val ;
@@ -1980,76 +1902,87 @@ Symbol Parser::RelationTypeCheck(Symbol expectedType, Symbol term, Symbol relati
         sym.SetLLVMValue(val);
         sym.SetType(T_BOOL);
 
-        return sym;
+        out.CopySymbol(sym);
+        return;
     }
     else
     {
-        return term;
+        out.CopySymbol(term);
+        return;
     }
 }
 
 // <term>
-Symbol Parser::Term(Symbol expectedType)
+void Parser::Term(Symbol expectedType, Symbol &out)
 {
-    Symbol factor = Factor(expectedType);
+    Symbol factor = Symbol();
+    Factor(expectedType, factor);
     token_t *op = scanner.PeekToken();
-    Symbol term_ = Term_(expectedType);
+    Symbol term_ = Symbol();
+    Term_(expectedType, term_);
 
-    return ArithOpTypeCheck(expectedType, factor, term_, op);
+    ArithOpTypeCheck(expectedType, factor, term_, op, out);
+    return;
 }
 
 // <term>
-Symbol Parser::Term_(Symbol expectedType)
+void Parser::Term_(Symbol expectedType, Symbol &out)
 {
     if (ValidateToken(T_DIVIDE) || ValidateToken(T_MULTIPLY))
     {
-        Symbol factor = Factor(expectedType);
+        Symbol factor = Symbol();
+        Factor(expectedType, factor);
         token_t *op = scanner.PeekToken();
-        Symbol term_ = Term_(expectedType);
+        Symbol term_ = Symbol();
+        Term_(expectedType, term_);
 
-        return ArithOpTypeCheck(expectedType, factor, term_, op);
+        ArithOpTypeCheck(expectedType, factor, term_, op, out);
+        return;
     }
 
     Symbol sym = Symbol();
     sym.SetIsValid(false);
 
-    return sym;
+    out.CopySymbol(sym);
+    return;
 }
 
 // <factor>
-Symbol Parser::Factor(Symbol expectedType)
+void Parser::Factor(Symbol expectedType, Symbol &out)
 {
     // This just follows the rules defined in the project language for <factor> syntax
     Symbol sym = Symbol();
     if (ValidateToken(T_LPAREN))
     {
-        sym = Expression(expectedType);
+        Expression(expectedType, sym);
         if (!ValidateToken(T_RPAREN))
         {
             ReportMissingTokenError(")");
             sym.SetIsValid(false);
-            return sym;
+            out.CopySymbol(sym);
+            return;
         }
     }
     else if (ValidateToken(T_IDENTIFIER))
     {
-        sym = ProcedureCallOrName();
+        ProcedureCallOrName(sym);
     }
     else if (ValidateToken(T_SUBTRACT))
     {
         if (ValidateToken(T_INT_LITERAL) || (ValidateToken(T_FLOAT_LITERAL)))
         {
-            sym = Number();
+            Number(sym);
         }
         else if (ValidateToken(T_IDENTIFIER))
         {
-            sym = ProcedureCallOrName();
+            ProcedureCallOrName(sym);
         }
         else
         {
             ReportError("Expected an identifier or number literal");
             sym.SetIsValid(false);
-            return sym;
+            out.CopySymbol(sym);
+            return;
         }
 
         if (sym.GetType() == T_INTEGER)
@@ -2071,11 +2004,11 @@ Symbol Parser::Factor(Symbol expectedType)
     }
     else if (ValidateToken(T_INT_LITERAL) || ValidateToken(T_FLOAT_LITERAL))
     {
-        sym = Number();
+        Number(sym);
     }
     else if (ValidateToken(T_STRING_LITERAL))
     {
-        sym = String();
+        String(sym);
     }
     else if (ValidateToken(T_TRUE))
     {
@@ -2093,15 +2026,17 @@ Symbol Parser::Factor(Symbol expectedType)
     {
         ReportError("Factor expected");
         sym.SetIsValid(false);
-        return sym;
+        out.CopySymbol(sym);
+        return;
     }
 
-    return sym;
+    out.CopySymbol(sym);
+    return;
 }
 
 // Combines <procedure_call> and <name> because both are <identifier>'s. The two are then differentiated here and
 // the appropriate course of action is taken for each.
-Symbol Parser::ProcedureCallOrName()
+void Parser::ProcedureCallOrName(Symbol &out)
 {
     Symbol sym = Symbol();
     std::string id = token->val.stringValue;
@@ -2110,7 +2045,8 @@ Symbol Parser::ProcedureCallOrName()
     if (!sym.IsValid())
     {
         ReportError("Symbol not found: " + id);
-        return sym;
+        out.CopySymbol(sym);
+        return;
     }
 
     // if there is a parenthesis this is a procedure, as () is required
@@ -2123,7 +2059,8 @@ Symbol Parser::ProcedureCallOrName()
             sym = Symbol();
             sym.SetIsValid(false);
 
-            return sym;
+            out.CopySymbol(sym);
+            return;
         }
 
         Symbol procSym = sym;
@@ -2152,7 +2089,8 @@ Symbol Parser::ProcedureCallOrName()
                 ReportError("Missing arguments for procedure");
                 sym.SetIsValid(false);
 
-                return sym;
+                out.CopySymbol(sym);
+                return;
             }
 
             llvm::Value *val = llvmBuilder->CreateCall(procSym.GetLLVMFunction());
@@ -2163,7 +2101,9 @@ Symbol Parser::ProcedureCallOrName()
         {
             ReportMissingTokenError(")");
             sym.SetIsValid(false);
-            return sym;
+
+            out.CopySymbol(sym);
+            return;
         }
     }
     else
@@ -2174,7 +2114,8 @@ Symbol Parser::ProcedureCallOrName()
             ReportError("Name must be a variable");
             sym.SetIsValid(false);
 
-            return sym;
+            out.CopySymbol(sym);
+            return;
         }
 
         if (ValidateToken(T_LBRACKET))
@@ -2185,10 +2126,12 @@ Symbol Parser::ProcedureCallOrName()
                 ReportError("Indexing is not supported for non-arrays.");
                 sym = Symbol();
                 sym.SetIsValid(false);
-                return sym;
+
+                out.CopySymbol(sym);
+                return;
             }
 
-            sym = IndexArray(sym);
+            IndexArray(sym, sym);
         }
         else if (doUnroll)
         {
@@ -2201,7 +2144,9 @@ Symbol Parser::ProcedureCallOrName()
                     ReportError("Array size is smaller than destination size. Unroll failed.");
                     sym = Symbol();
                     sym.SetIsValid(false);
-                    return sym;
+
+                    out.CopySymbol(sym);
+                    return;
                 }
 
                 llvm::Value *addr = llvmBuilder->CreateGEP(sym.GetLLVMArrayAddress(), unrollIdx);
@@ -2221,7 +2166,8 @@ Symbol Parser::ProcedureCallOrName()
                 ReportError("Variable has not yet been initialized");
                 sym.SetIsValid(false);
 
-                return sym;
+                out.CopySymbol(sym);
+                return;
             }
 
             // Load value
@@ -2230,11 +2176,12 @@ Symbol Parser::ProcedureCallOrName()
         }
     }
 
-    return sym;
+    out.CopySymbol(sym);
+    return;
 }
 
 // <number>
-Symbol Parser::Number()
+void Parser::Number(Symbol &out)
 {
     Symbol sym = Symbol();
 
@@ -2253,24 +2200,27 @@ Symbol Parser::Number()
 
     sym.SetLLVMValue(val);
 
-    return sym;
+    out.CopySymbol(sym);
+    return;
 }
 
 // <string>
-Symbol Parser::String()
+void Parser::String(Symbol &out)
 {
     Symbol sym = Symbol();
     if (token->type != T_STRING_LITERAL)
     {
         ReportError("String literal expected.");
-        return sym;
+        out.CopySymbol(sym);
+        return;
     }
 
     sym.SetType(T_STRING);
     llvm::Value *val = llvmBuilder->CreateGlobalStringPtr(token->val.stringValue);
     sym.SetLLVMValue(val);
 
-    return sym;
+    out.CopySymbol(sym);
+    return;
 }
 
 // <argument_list>
@@ -2290,8 +2240,9 @@ std::vector<llvm::Value *> Parser::ArgumentList(std::vector<Symbol>::iterator cu
         }
 
         // Make sure the type matches what is expected
-        Symbol expr = Expression(*curr);
-        expr = AssignmentTypeCheck(*curr, expr, token);
+        Symbol expr = Symbol();
+        Expression(*curr, expr);
+        AssignmentTypeCheck(*curr, expr, token, expr);
 
         if (curr->IsArray())
         {
