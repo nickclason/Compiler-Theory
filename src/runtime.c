@@ -71,7 +71,8 @@ char* GETSTRING()
     char *string = malloc(max_length * sizeof(char));
     fgets(string, max_length, stdin);
     // remove trailing new line if there is one
-    if ((strlen(string) > 0) && (string[strlen(string) - 1] == '\n')) {
+    if ((strlen(string) > 0) && (string[strlen(string) - 1] == '\n'))
+    {
         string[strlen(string) - 1] = '\0';
     }
     return string;
