@@ -151,3 +151,23 @@ llvm::Function *Symbol::GetLLVMFunction() const {
 void Symbol::SetLLVMFunction(llvm::Function *llvmFunction) {
     Symbol::llvmFunction = llvmFunction;
 }
+
+void Symbol::CopySymbol(Symbol toCopy)
+{
+    // I am to lazy to overload the = operator even though this is probably more work
+    // actually this might just be a copy constructor...
+    this->SetId(toCopy.GetId());
+    this->SetArraySize(toCopy.GetArraySize());
+    this->SetDeclarationType(toCopy.GetDeclarationType());
+    this->SetType(toCopy.GetType());
+    this->SetIsArray(toCopy.IsArray());
+    this->SetIsGlobal(toCopy.IsGlobal());
+    this->SetIsInitialized(toCopy.IsInitialized());
+    this->SetIsValid(toCopy.IsValid());
+    this->SetIsArrayIndexed(toCopy.IsArrayIndexed());
+    this->SetLLVMAddress(toCopy.GetLLVMAddress());
+    this->SetLLVMValue(toCopy.GetLLVMValue());
+    this->SetLLVMArraySize(toCopy.GetLLVMArraySize());
+    this->SetLLVMFunction(toCopy.GetLLVMFunction());
+    this->SetParameters(toCopy.GetParameters());
+}
