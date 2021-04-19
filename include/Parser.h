@@ -17,9 +17,6 @@ public:
     Parser(Scanner scanner_, SymbolTable symbolTable_, token_t *token_);
     ~Parser();
 
-    void Program();
-    void InitLLVM();
-
 private:
     Scanner scanner;
     SymbolTable symbolTable;
@@ -30,7 +27,6 @@ private:
     int warningCount;
     int unrollSize;
 
-    bool debug;
     bool errorFlag;
     bool doUnroll;
     llvm::Module *llvmModule;
@@ -58,6 +54,7 @@ private:
     //bool Resync(int tokens[], int length);
 
     // Parsing
+    void Program();
     void ProgramHeader();
     void ProgramBody();
 

@@ -75,7 +75,64 @@ Parser::Parser(Scanner scanner_, SymbolTable symbolTable_, token_t *token_)
     if (!errorFlag && errorCount == 0)
     {
         // Compile
-        InitLLVM();
+        std::string outFile = "output/IR.ll";
+        std::error_code error_code;
+        llvm::raw_fd_ostream out(outFile, error_code, llvm::sys::fs::F_None);
+        llvmModule->print(out, nullptr);
+
+        // TODO: no idea what is causing verification to fail, but i have not encountered any issues in
+        //       generating IR/compiling/linking... yet
+        // bool isVerified = llvm::verifyModule(*llvmModule, &llvm::errs());
+        // if (!isVerified) { llvmModule->print(llvm::errs(), nullptr); return; }
+
+        auto TargetTriple = llvm::sys::getDefaultTargetTriple();
+
+        llvm::InitializeAllTargetInfos();
+        llvm::InitializeAllTargets();
+        llvm::InitializeAllTargetMCs();
+        llvm::InitializeAllAsmParsers();
+        llvm::InitializeAllAsmPrinters();
+
+        std::string Error;
+        auto Target = llvm::TargetRegistry::lookupTarget(TargetTriple, Error);
+
+        if (!Target)
+        {
+            llvm::errs() << Error;
+            return;
+        }
+
+        auto CPU = "generic";
+        auto Features = "";
+
+        llvm::TargetOptions opt;
+        auto RM = llvm::Optional<llvm::Reloc::Model>();
+        auto TargetMachine = Target->createTargetMachine(TargetTriple, CPU, Features, opt, RM);
+
+        llvmModule->setDataLayout(TargetMachine->createDataLayout());
+        llvmModule->setTargetTriple(TargetTriple);
+
+        auto Filename = "output/output.o";
+        std::error_code EC;
+        llvm::raw_fd_ostream dest(Filename, EC, llvm::sys::fs::OF_None);
+
+        if (EC)
+        {
+            llvm::errs() << "Could not open file: " << EC.message();
+            return;
+        }
+
+        llvm::legacy::PassManager pass;
+        auto FileType = llvm::CGFT_ObjectFile;
+
+        if (TargetMachine->addPassesToEmitFile(pass, dest, nullptr, FileType))
+        {
+            llvm::errs() << "TargetMachine can't emit a file of this type";
+            return;
+        }
+
+        pass.run(*llvmModule);
+        dest.flush();
     }
 }
 
@@ -159,70 +216,6 @@ void Parser::ProgramBody()
 
     llvm::Constant *retVal = llvm::ConstantInt::getIntegerValue(llvmBuilder->getInt32Ty(), llvm::APInt(32, 0, true));
     llvmBuilder->CreateRet(retVal);
-}
-
-// The majority of this function is the steps from the LLVM kaleidoscope tutorial
-// used to generate a .o file from the IR
-void Parser::InitLLVM()
-{
-    std::string outFile = "output/IR.ll";
-    std::error_code error_code;
-    llvm::raw_fd_ostream out(outFile, error_code, llvm::sys::fs::F_None);
-    llvmModule->print(out, nullptr);
-
-    // TODO: no idea what is causing verification to fail, but i have not encountered any issues in
-    //       generating IR/compiling/linking... yet
-//    bool isVerified = llvm::verifyModule(*llvmModule, &llvm::errs());
-//    if (!isVerified) { llvmModule->print(llvm::errs(), nullptr); return; }
-
-    auto TargetTriple = llvm::sys::getDefaultTargetTriple();
-
-    llvm::InitializeAllTargetInfos();
-    llvm::InitializeAllTargets();
-    llvm::InitializeAllTargetMCs();
-    llvm::InitializeAllAsmParsers();
-    llvm::InitializeAllAsmPrinters();
-
-    std::string Error;
-    auto Target = llvm::TargetRegistry::lookupTarget(TargetTriple, Error);
-
-    if (!Target)
-    {
-        llvm::errs() << Error;
-        return;
-    }
-
-    auto CPU = "generic";
-    auto Features = "";
-
-    llvm::TargetOptions opt;
-    auto RM = llvm::Optional<llvm::Reloc::Model>();
-    auto TargetMachine = Target->createTargetMachine(TargetTriple, CPU, Features, opt, RM);
-
-    llvmModule->setDataLayout(TargetMachine->createDataLayout());
-    llvmModule->setTargetTriple(TargetTriple);
-
-    auto Filename = "output/output.o";
-    std::error_code EC;
-    llvm::raw_fd_ostream dest(Filename, EC, llvm::sys::fs::OF_None);
-
-    if (EC)
-    {
-        llvm::errs() << "Could not open file: " << EC.message();
-        return;
-    }
-
-    llvm::legacy::PassManager pass;
-    auto FileType = llvm::CGFT_ObjectFile;
-
-    if (TargetMachine->addPassesToEmitFile(pass, dest, nullptr, FileType))
-    {
-        llvm::errs() << "TargetMachine can't emit a file of this type";
-        return;
-    }
-
-    pass.run(*llvmModule);
-    dest.flush();
 }
 
 // This function handles checking token type matches the expected type
