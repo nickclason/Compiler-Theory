@@ -55,7 +55,7 @@ private:
 
     void ReportWarning(std::string msg);
 
-    void Resync(int tokens[], int length);
+    //bool Resync(int tokens[], int length);
 
     // Parsing
     void ProgramHeader();

@@ -1,6 +1,6 @@
 program test is
-    global variable arr : integer[3];
-    global variable arr2 : integer[3];
+    variable arr : integer[3];
+    variable arr2 : integer[3];
     variable i : integer;
     variable tmp : bool;
 

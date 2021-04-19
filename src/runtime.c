@@ -11,30 +11,15 @@
 
 bool PUTINTEGER(int num)
 {
-    printf("%i\n", num);
+    printf("%d\n", num);
     return true;
 }
 
 int GETINTEGER()
 {
     int num;
-    scanf("%i", &num);
-    getchar();
+    scanf("%d", &num);
     return num;
-}
-
-bool PUTBOOL(bool val)
-{
-    printf("%i\n", val);
-    return true;
-}
-
-bool GETBOOL()
-{
-    int val;
-    scanf("%i", &val);
-    getchar();
-    return (val == 1);
 }
 
 bool PUTFLOAT(float num)
@@ -47,8 +32,21 @@ float GETFLOAT()
 {
     float num;
     scanf("%f", &num);
-    getchar();
     return num;
+}
+
+bool PUTBOOL(bool val)
+{
+    val ? printf("true") : printf("false");
+//    printf("%i\n", val);
+    return true;
+}
+
+bool GETBOOL()
+{
+    int val;
+    scanf("%i", &val);
+    return (val == 1);
 }
 
 bool PUTSTRING(char *str)
@@ -59,36 +57,19 @@ bool PUTSTRING(char *str)
 
 char* GETSTRING()
 {
-
-
     int max_length = 256;
     char *string = malloc(max_length * sizeof(char));
-    fgets(string, max_length, stdin);
-    // remove trailing new line if there is one
-    if ((strlen(string) > 0) && (string[strlen(string) - 1] == '\n'))
-    {
-        string[strlen(string) - 1] = '\0';
-    }
+    scanf("%s", string);
+    string[strlen(string) - 1] = '\0';
     return string;
 
-//    char *string = "a"; // TODO: WHY DOES DOING THIS WORK
+    // TODO: So for some reason, when you hard code in the string, string comparisons work (str == "A")
+    //       I cannot figure out why my regular method of taking a string as an input causes the comparison
+    //       to fail, so leaving as is for now, I do not think it is a major issue as this is one of the very
+    //       few things not working correctly, as far as I am aware.
+
+//    char *string = "A";
 //    return string;
-
-
-//    char *buffer;
-//    size_t buf_size = 32;
-//    size_t characters;
-//
-//    buffer = (char *)malloc(buf_size * sizeof(char));
-//    if( buffer == NULL)
-//    {
-//        perror("Unable to allocate buffer");
-//        exit(1);
-//    }
-//
-//    characters = getline(&buffer,&buf_size,stdin);
-//
-//    return buffer;
 
 }
 

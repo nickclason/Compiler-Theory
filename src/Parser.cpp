@@ -3,8 +3,9 @@
 //
 
 // TODO: Global arrays don't work properly when operating on entire array.
-// Something is wrong in logicals.src now... else condition doesnt work on strings???..single character strings???
-// todo: get rid of getllvmtype because of the fucking idiot that is just copying
+// TODO: currently, you can override the built in functions... need to fix...
+// TODO: Resync ?
+// TODO: getString doesn't work properly, string comparisons get fucked
 // todo: refactor runtime
 
 #include "../include/Parser.h"
@@ -110,7 +111,7 @@ void Parser::ProgramHeader()
     llvmModule = new llvm::Module(id, llvmContext);
     llvmBuilder = new llvm::IRBuilder<>(llvmContext);
 
-    symbolTable.AddIOFunctions(llvmModule, llvmContext, llvmBuilder);
+    symbolTable.AddIOFunctions(llvmModule, llvmBuilder);
 }
 
 // <program_body>
@@ -361,7 +362,6 @@ void Parser::Declarations()
         if (errorFlag)
         {
             // TODO: resync
-            return;
         }
         else
         {

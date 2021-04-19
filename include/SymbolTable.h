@@ -34,13 +34,19 @@ public:
 
     std::map<std::string, Symbol> GetLocalScope();
 
-    void AddIOFunctions(llvm::Module *llvmModule, llvm::LLVMContext &llvmContext, llvm::IRBuilder<> * llvmBuilder);
+    void AddIOFunctions(llvm::Module *llvmModule, llvm::IRBuilder<> * llvmBuilder);
 
     int GetScopeCount();
 
 private:
     std::map<std::string, Symbol> globalScope;
     std::vector<std::map<std::string, Symbol> > localScopes;
+
+    Symbol GeneratePutSymbol(std::string id, int type, Symbol args, llvm::Module *llvmModule,
+                             llvm::IRBuilder<> *llvmBuilder, llvm::ArrayRef<llvm::Type *> llvmArgType);
+
+    Symbol GenerateGetSymbol(std::string id, int type, llvm::Module *llvmModule,
+                             llvm::IRBuilder<> *llvmBuilder, llvm::Type *llvmTy);
 
     int scopeCount;
 };

@@ -40,28 +40,26 @@ void SymbolTable::AddSymbol(Symbol &symbol)
     if (symbol.IsGlobal())
     {
         globalScope[symbol.GetId()] = symbol;
+        return;
     }
-    else
-    {
-        localScopes.back()[symbol.GetId()] = symbol;
-    }
+
+    localScopes.back()[symbol.GetId()] = symbol;
 }
 
 void SymbolTable::SetScopeProc(Symbol proc)
 {
-    localScopes.back()["_proc"] = proc;
+    localScopes.back()["_procedure"] = proc;
 }
 
 Symbol SymbolTable::GetScopeProc()
 {
-    std::map<std::string, Symbol>::iterator it = localScopes.back().find("_proc");
-    if (it != localScopes.back().end())
+    if (localScopes.back().find("_procedure") != localScopes.back().end())
     {
-        return it->second;
+        return localScopes.back().find("_procedure")->second;
     }
     else
     {
-        Symbol symbol;
+        Symbol symbol = Symbol();
         symbol.SetIsValid(false);
         return symbol;
     }
@@ -69,8 +67,7 @@ Symbol SymbolTable::GetScopeProc()
 
 bool SymbolTable::DoesSymbolExist(std::string id)
 {
-    std::map<std::string, Symbol>::iterator it = localScopes.back().find(id);
-    if (it != localScopes.back().end())
+    if (localScopes.back().find(id) != localScopes.back().end())
     {
         return true;
     }
@@ -79,8 +76,7 @@ bool SymbolTable::DoesSymbolExist(std::string id)
         return false;
     }
 
-    it = globalScope.find(id);
-    if (it != globalScope.end())
+    if (globalScope.find(id) != globalScope.end())
     {
         return true;
     }
@@ -115,145 +111,69 @@ std::map<std::string, Symbol> SymbolTable::GetLocalScope()
     return localScopes.back();
 }
 
-void SymbolTable::AddIOFunctions(llvm::Module *llvmModule, llvm::LLVMContext &llvmContext, llvm::IRBuilder<> *llvmBuilder)
+void SymbolTable::AddIOFunctions(llvm::Module *llvmModule, llvm::IRBuilder<> *llvmBuilder)
 {
     llvm::FunctionType *type = nullptr;
     llvm::Function *procedure = nullptr;
-
-    Symbol putInteger;
-    putInteger.SetId("PUTINTEGER");
-    putInteger.SetType(T_BOOL);
-    Symbol putIntegerArgs;
-    putIntegerArgs.SetId("num");
-    putIntegerArgs.SetType(T_INTEGER);
-    putIntegerArgs.SetDeclarationType(T_VARIABLE);
-    putInteger.GetParameters().push_back(putIntegerArgs);
-    putInteger.SetIsGlobal(true);
-    putInteger.SetDeclarationType(T_PROCEDURE);
-    type = llvm::FunctionType::get(llvmBuilder->getInt1Ty(),{llvmBuilder->getInt32Ty()},false);
-    procedure = llvm::Function::Create(type,llvm::Function::ExternalLinkage,putInteger.GetId(),llvmModule);
-    putInteger.SetLLVMFunction(procedure);
-    AddSymbol(putInteger);
-
-    Symbol getInteger;
-    getInteger.SetId("GETINTEGER");
-    getInteger.SetType(T_INTEGER);
-    getInteger.SetIsGlobal(true);
-    getInteger.SetDeclarationType(T_PROCEDURE);
-    type = llvm::FunctionType::get(llvmBuilder->getInt32Ty(), {},false);
-    procedure = llvm::Function::Create(type, llvm::Function::ExternalLinkage, getInteger.GetId(), llvmModule);
-    getInteger.SetLLVMFunction(procedure);
-    AddSymbol(getInteger);
-
-    Symbol putFloat;
-    putFloat.SetId("PUTFLOAT");
-    putFloat.SetType(T_BOOL);
-    Symbol putFloatArgs;
-    putFloatArgs.SetId("num");
-    putFloatArgs.SetType(T_FLOAT);
-    putFloatArgs.SetDeclarationType(T_VARIABLE);
-    putFloat.GetParameters().push_back(putFloatArgs);
-    putFloat.SetIsGlobal(true);
-    putFloat.SetDeclarationType(T_PROCEDURE);
-    type = llvm::FunctionType::get(llvmBuilder->getInt1Ty(),{llvmBuilder->getFloatTy()},false);
-    procedure = llvm::Function::Create(type,llvm::Function::ExternalLinkage,putFloat.GetId(),llvmModule);
-    putFloat.SetLLVMFunction(procedure);
-    AddSymbol(putFloat);
-
-    Symbol getFloat;
-    getFloat.SetId("GETFLOAT");
-    getFloat.SetType(T_FLOAT);
-    getFloat.SetIsGlobal(true);
-    getInteger.SetDeclarationType(T_PROCEDURE);
-    type = llvm::FunctionType::get(llvmBuilder->getFloatTy(), {},false);
-    procedure = llvm::Function::Create(type, llvm::Function::ExternalLinkage, getFloat.GetId(), llvmModule);
-    getFloat.SetLLVMFunction(procedure);
-    AddSymbol(getFloat);
-
-    Symbol putBool;
-    putBool.SetId("PUTBOOL");
-    putBool.SetType(T_BOOL);
-    Symbol putBoolArgs;
-    putBoolArgs.SetId("num");
-    putBoolArgs.SetType(T_BOOL);
-    putBoolArgs.SetDeclarationType(T_VARIABLE);
-    putBool.GetParameters().push_back(putBoolArgs);
-    putBool.SetIsGlobal(true);
-    putBool.SetDeclarationType(T_PROCEDURE);
-    type = llvm::FunctionType::get(llvmBuilder->getInt1Ty(),{llvmBuilder->getInt1Ty()},false);
-    procedure = llvm::Function::Create(type,llvm::Function::ExternalLinkage, putBool.GetId(), llvmModule);
-    putBool.SetLLVMFunction(procedure);
-    AddSymbol(putBool);
-
-    Symbol getBool;
-    getBool.SetId("GETBOOL");
-    getBool.SetType(T_BOOL);
-    getBool.SetIsGlobal(true);
-    getBool.SetDeclarationType(T_PROCEDURE);
-    type = llvm::FunctionType::get(llvmBuilder->getInt1Ty(), {},false);
-    procedure = llvm::Function::Create(type, llvm::Function::ExternalLinkage, getBool.GetId(), llvmModule);
-    getBool.SetLLVMFunction(procedure);
-    AddSymbol(getBool);
-
-    Symbol putString;
-    putString.SetId("PUTSTRING");
-    putString.SetType(T_BOOL);
-    Symbol putStringArgs;
-    putStringArgs.SetId("str");
-    putStringArgs.SetType(T_STRING);
-    putStringArgs.SetDeclarationType(T_VARIABLE);
-    putString.GetParameters().push_back(putStringArgs);
-    putString.SetIsGlobal(true);
-    putString.SetDeclarationType(T_PROCEDURE);
-    type = llvm::FunctionType::get(llvmBuilder->getInt1Ty(),{llvmBuilder->getInt8PtrTy()},false);
-    procedure = llvm::Function::Create(type, llvm::Function::ExternalLinkage, putString.GetId(), llvmModule);
-    putString.SetLLVMFunction(procedure);
-    AddSymbol(putString);
-
-//    Symbol getString;
-//    getString.SetId("GETSTRING");
-//    getString.SetType(T_STRING);
-//    getString.SetIsGlobal(true);
-//    getString.SetDeclarationType(T_PROCEDURE);
-//    type = llvm::FunctionType::get(llvmBuilder->getInt8PtrTy(), {},false);
-//    procedure = llvm::Function::Create(type, llvm::Function::ExternalLinkage, getString.GetId(), llvmModule);
-//    getString.SetLLVMFunction(procedure);
-//    AddSymbol(getString);
-
-    Symbol get_string;
-    get_string.SetId("GETSTRING");
-    get_string.SetType(T_STRING);
-    get_string.SetIsGlobal(true);
-    get_string.SetDeclarationType(T_PROCEDURE);
-
-    llvm::FunctionType *function_type = llvm::FunctionType::get(
-            llvmBuilder->getInt8PtrTy(),
-            {},
-            false);
-    procedure = llvm::Function::Create(
-            function_type,
-            llvm::Function::ExternalLinkage,
-            get_string.GetId(),
-            llvmModule);
-    get_string.SetLLVMFunction(procedure);
-
-    AddSymbol(get_string);
-
-    Symbol sqrt;
-    sqrt.SetId("SQRT");
-    sqrt.SetType(T_FLOAT);
     Symbol args;
+
+    // putInteger
+    args = Symbol();
     args.SetId("num");
     args.SetType(T_INTEGER);
     args.SetDeclarationType(T_VARIABLE);
-    sqrt.GetParameters().push_back(args);
-    sqrt.SetIsGlobal(true);
-    sqrt.SetDeclarationType(T_PROCEDURE);
-    type = llvm::FunctionType::get(llvmBuilder->getFloatTy(), {llvmBuilder->getInt32Ty()}, false);
-    procedure = llvm::Function::Create(type, llvm::Function::ExternalLinkage, sqrt.GetId(), llvmModule);
-    sqrt.SetLLVMFunction(procedure);
+    Symbol putInt = GeneratePutSymbol("PUTINTEGER", T_BOOL, args, llvmModule, llvmBuilder,{llvmBuilder->getInt32Ty()});
+    AddSymbol(putInt);
+
+    // getInteger
+    Symbol getInt = GenerateGetSymbol("GETINTEGER", T_INTEGER, llvmModule, llvmBuilder, llvmBuilder->getInt32Ty());
+    AddSymbol(getInt);
+
+    // putFloat
+    args = Symbol();
+    args.SetId("num");
+    args.SetType(T_FLOAT);
+    args.SetDeclarationType(T_VARIABLE);
+    Symbol putFloat = GeneratePutSymbol("PUTFLOAT", T_BOOL, args, llvmModule, llvmBuilder, {llvmBuilder->getFloatTy()});
+    AddSymbol(putFloat);
+
+    // getFloat
+    Symbol getFloat = GenerateGetSymbol("GETFLOAT", T_FLOAT, llvmModule, llvmBuilder, llvmBuilder->getFloatTy());
+    AddSymbol(getFloat);
+
+    // putBool
+    args = Symbol();
+    args.SetId("num");
+    args.SetType(T_BOOL);
+    args.SetDeclarationType(T_VARIABLE);
+    Symbol putBool = GeneratePutSymbol("PUTBOOL", T_BOOL, args, llvmModule, llvmBuilder, {llvmBuilder->getInt1Ty()});
+    AddSymbol(putBool);
+
+    // getBool
+    Symbol getBool = GenerateGetSymbol("GETBOOL", T_BOOL, llvmModule, llvmBuilder, llvmBuilder->getInt1Ty());
+    AddSymbol(getBool);
+
+    // putString
+    args = Symbol();
+    args.SetId("str");
+    args.SetType(T_STRING);
+    args.SetDeclarationType(T_VARIABLE);
+    Symbol putString = GeneratePutSymbol("PUTSTRING", T_BOOL, args, llvmModule, llvmBuilder, {llvmBuilder->getInt8PtrTy()});
+    AddSymbol(putString);
+
+    // getString
+    Symbol getString = GenerateGetSymbol("GETSTRING", T_BOOL, llvmModule, llvmBuilder, llvmBuilder->getInt8PtrTy());
+    AddSymbol(getString);
+
+    // sqrt
+    args = Symbol();
+    args.SetId("num");
+    args.SetType(T_INTEGER);
+    args.SetDeclarationType(T_VARIABLE);
+    Symbol sqrt = GeneratePutSymbol("SQRT", T_FLOAT, args, llvmModule, llvmBuilder, {llvmBuilder->getInt32Ty()});
     AddSymbol(sqrt);
 
+    // Array out-of-bounds error
     Symbol oobError;
     oobError.SetId("OOB_ERROR");
     oobError.SetType(T_BOOL);
@@ -268,4 +188,50 @@ void SymbolTable::AddIOFunctions(llvm::Module *llvmModule, llvm::LLVMContext &ll
 int SymbolTable::GetScopeCount()
 {
     return scopeCount;
+}
+
+Symbol SymbolTable::GeneratePutSymbol(std::string id, int type, Symbol args, llvm::Module *llvmModule,
+                                      llvm::IRBuilder<> *llvmBuilder, llvm::ArrayRef<llvm::Type *> llvmArgType)
+{
+    llvm::FunctionType *llvmType = nullptr;
+    llvm::Function *procedure = nullptr;
+
+    Symbol put;
+    put.SetId(id);
+    put.SetType(type);
+
+    put.GetParameters().push_back(args);
+    put.SetIsGlobal(true);
+    put.SetDeclarationType(T_PROCEDURE);
+
+    if (id == "SQRT")
+    {
+        llvmType = llvm::FunctionType::get(llvmBuilder->getFloatTy(), llvmArgType, false);
+    }
+    else
+    {
+        llvmType = llvm::FunctionType::get(llvmBuilder->getInt1Ty(), llvmArgType, false);
+    }
+    procedure = llvm::Function::Create(llvmType, llvm::Function::ExternalLinkage, put.GetId(), llvmModule);
+    put.SetLLVMFunction(procedure);
+
+    return put;
+}
+
+Symbol SymbolTable::GenerateGetSymbol(std::string id, int type, llvm::Module *llvmModule,
+                                      llvm::IRBuilder<> *llvmBuilder, llvm::Type *llvmTy)
+{
+    llvm::FunctionType *llvmType = nullptr;
+    llvm::Function *procedure = nullptr;
+
+    Symbol get;
+    get.SetId(id);
+    get.SetType(type);
+    get.SetIsGlobal(true);
+    get.SetDeclarationType(T_PROCEDURE);
+    llvmType = llvm::FunctionType::get(llvmTy, {},false);
+    procedure = llvm::Function::Create(llvmType, llvm::Function::ExternalLinkage, get.GetId(), llvmModule);
+    get.SetLLVMFunction(procedure);
+
+    return get;
 }

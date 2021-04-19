@@ -1,23 +1,14 @@
 program test is
 
-global variable x : bool;
-global variable c : string;
-global variable tmp : bool;
+variable test_str : string;
+variable tmp : bool;
+variable i : integer;
+variable cmp : string;
+variable square : float;
 
 begin
 
-x := getBool();
-if(x) then
-	tmp := putString("T");
-else
-	tmp := putString("F");
-end if;
-
-c := "apple";
-if(c == "Apple") then
-	tmp := putString("T");
-else
-	tmp := putString("F");
-end if;
+    square := sqrt(9);
+    tmp := putFloat(square);
 
 end program.
