@@ -3,10 +3,12 @@
 //
 
 // TODO: Global arrays don't work properly when operating on entire array.
-// TODO: currently, you can override the built in functions... need to fix...
+// TODO: take another look at how I am manageing scopes/scope count shit...
+//       currently, you can override the built in functions... need to fix...
+
 // TODO: Resync ?
 // TODO: getString doesn't work properly, string comparisons get fucked
-// todo: refactor runtime
+
 
 #include "../include/Parser.h"
 
@@ -172,9 +174,9 @@ void Parser::InitLLVM()
     llvmModule->print(out, nullptr);
 
     // TODO: no idea what is causing verification to fail, but i have not encountered any issues in
-    //       generating IR/compiling/linking
-    //bool isVerified = llvm::verifyModule(*llvmModule, &llvm::errs());
-    //if (!isVerified) { llvmModule->print(llvm::errs(), nullptr); return; }
+    //       generating IR/compiling/linking... yet
+//    bool isVerified = llvm::verifyModule(*llvmModule, &llvm::errs());
+//    if (!isVerified) { llvmModule->print(llvm::errs(), nullptr); return; }
 
     auto TargetTriple = llvm::sys::getDefaultTargetTriple();
 

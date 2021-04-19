@@ -1,14 +1,19 @@
 program test is
 
-variable test_str : string;
 variable tmp : bool;
-variable i : integer;
-variable cmp : string;
 variable square : float;
+
+procedure getInteger : integer()
+    variable x : integer;
+    begin
+        x := 1;
+        return x;
+end procedure;
 
 begin
 
     square := sqrt(9);
     tmp := putFloat(square);
+    tmp := putInteger(getInteger());
 
 end program.

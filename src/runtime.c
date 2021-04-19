@@ -63,13 +63,13 @@ char* GETSTRING()
     string[strlen(string) - 1] = '\0';
     return string;
 
-    // TODO: So for some reason, when you hard code in the string, string comparisons work (str == "A")
-    //       I cannot figure out why my regular method of taking a string as an input causes the comparison
-    //       to fail, so leaving as is for now, I do not think it is a major issue as this is one of the very
-    //       few things not working correctly, as far as I am aware.
+    //  So for some reason, when you hard code in the string, string comparisons work (str == "A")
+    //  I cannot figure out why my regular method of taking a string as an input causes the comparison
+    //  to fail, so leaving as is for now, I do not think it is a major issue as this is one of the very
+    //  few things not working correctly, as far as I am aware.
 
-//    char *string = "A";
-//    return string;
+    // char *string = "A";
+    // return string;
 
 }
 

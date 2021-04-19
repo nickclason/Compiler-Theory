@@ -23,7 +23,6 @@ void SymbolTable::RemoveScope()
 {
     if (localScopes.size() > 0)
     {
-        //ReportUnusedVars(); // Todo: WIP
         localScopes.pop_back();
     }
     else
@@ -71,7 +70,7 @@ bool SymbolTable::DoesSymbolExist(std::string id)
     {
         return true;
     }
-    else if (scopeCount != 0)
+    else if (scopeCount != 0) // TODO: this is concerning... lets me redefine get/put methods
     {
         return false;
     }

@@ -94,7 +94,6 @@ std::map<std::string, int> Scanner::GenerateReservedTable()
     map["FLOAT"]    = T_FLOAT;
     map["STRING"]   = T_STRING;
     map["BOOL"]     = T_BOOL;
-    //map["ENUM"]     = T_ENUM;
 
     return map;
 }
