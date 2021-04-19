@@ -3,9 +3,6 @@
 //
 
 // TODO: Global arrays don't work properly when operating on entire array.
-// TODO: take another look at how I am manageing scopes/scope count shit...
-//       currently, you can override the built in functions... need to fix...
-
 // TODO: Resync ?
 // TODO: getString doesn't work properly, string comparisons get fucked
 
@@ -305,7 +302,7 @@ void Parser::ReportTypeMismatchError(std::string expected, std::string actual)
 {
     if (errorFlag) return;
 
-    printf("\nLine: %d Col: %d", token->line, token->col);
+    printf("\nLine: %d Col: %d\n", token->line, token->col);
     std::cout << "Expected: " << expected << std::endl;
     std::cout << "Actual: " << actual << std::endl;
     errorFlag = true;
