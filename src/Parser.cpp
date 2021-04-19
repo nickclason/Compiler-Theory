@@ -902,34 +902,31 @@ void Parser::IfStatement()
         return;
     }
 
-    // Create blocks for true and false
-    llvm::BasicBlock *true_ = nullptr;
-    llvm::BasicBlock *false_ = nullptr;
-    llvm::BasicBlock *end = nullptr;
-
-    true_ = llvm::BasicBlock::Create(llvmContext, "", llvmCurrProc);
-    false_ = llvm::BasicBlock::Create(llvmContext, "", llvmCurrProc);
+    // Create blocks for "if then" and "else"
+    llvm::BasicBlock *ifBlock = llvm::BasicBlock::Create(llvmContext, "if", llvmCurrProc);
+    llvm::BasicBlock *elseBlock = llvm::BasicBlock::Create(llvmContext, "else", llvmCurrProc);;
+    llvm::BasicBlock *endBlock = nullptr;
 
     // Conditional jump that is based on the expression
-    llvmBuilder->CreateCondBr(expr.GetLLVMValue(), true_, false_);
-    llvmBuilder->SetInsertPoint(true_);
+    llvmBuilder->CreateCondBr(expr.GetLLVMValue(), ifBlock, elseBlock);
+    llvmBuilder->SetInsertPoint(ifBlock);
 
-    // true_ block statements
+    // if block statements
     int terminators[] = {T_ELSE, T_END};
     Statements(terminators, 2);
 
     if (token->type == T_ELSE)
     {
-        end = llvm::BasicBlock::Create(llvmContext, "", llvmCurrProc);
+        endBlock = llvm::BasicBlock::Create(llvmContext, "", llvmCurrProc);
 
         if (llvmBuilder->GetInsertBlock()->getTerminator() == nullptr)
         {
-            llvmBuilder->CreateBr(end);
+            llvmBuilder->CreateBr(endBlock);
         }
 
-        llvmBuilder->SetInsertPoint(false_);
+        llvmBuilder->SetInsertPoint(elseBlock);
 
-        // false_ block statements
+        // else block statements
         int endElse[] = {T_END};
         Statements(endElse, 1);
     }
@@ -946,25 +943,25 @@ void Parser::IfStatement()
         return;
     }
 
-    if (end == nullptr)
+    if (endBlock == nullptr)
     {
-        // go from true_ to false_
+        // go from if to else
         if (llvmBuilder->GetInsertBlock()->getTerminator() == nullptr)
         {
-            llvmBuilder->CreateBr(false_);
+            llvmBuilder->CreateBr(elseBlock);
         }
 
-        llvmBuilder->SetInsertPoint(false_);
+        llvmBuilder->SetInsertPoint(elseBlock);
     }
     else
     {
-        // go from false_ to end
+        // go from else to end
         if (llvmBuilder->GetInsertBlock()->getTerminator() == nullptr)
         {
-            llvmBuilder->CreateBr(end);
+            llvmBuilder->CreateBr(endBlock);
         }
 
-        llvmBuilder->SetInsertPoint(end);
+        llvmBuilder->SetInsertPoint(endBlock);
     }
 }
 
@@ -2296,7 +2293,6 @@ llvm::Value *Parser::ConvertIntToBool(llvm::Value *intVal)
 // Helper function for performing string comparisions
 llvm::Value* Parser::DoStringComp(Symbol term, Symbol relation, token_t *op, llvm::Value* val)
 {
-    // TODO: look into cleaning this up and refactoring...
     // create a loop to compare strings
     llvm::Value *idxAddr = llvmBuilder->CreateAlloca(llvmBuilder->getInt32Ty());
     llvm::Value *idx = llvm::ConstantInt::getIntegerValue(llvmBuilder->getInt32Ty(), llvm::APInt(32, 0, true));

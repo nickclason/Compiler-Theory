@@ -161,7 +161,7 @@ void SymbolTable::AddIOFunctions(llvm::Module *llvmModule, llvm::IRBuilder<> *ll
     AddSymbol(putString);
 
     // getString
-    Symbol getString = GenerateGetSymbol("GETSTRING", T_BOOL, llvmModule, llvmBuilder, llvmBuilder->getInt8PtrTy());
+    Symbol getString = GenerateGetSymbol("GETSTRING", T_STRING, llvmModule, llvmBuilder, llvmBuilder->getInt8PtrTy());
     AddSymbol(getString);
 
     // sqrt
@@ -193,7 +193,6 @@ Symbol SymbolTable::GeneratePutSymbol(std::string id, int type, Symbol args, llv
                                       llvm::IRBuilder<> *llvmBuilder, llvm::ArrayRef<llvm::Type *> llvmArgType)
 {
     llvm::FunctionType *llvmType = nullptr;
-    llvm::Function *procedure = nullptr;
 
     Symbol put;
     put.SetId(id);
@@ -211,7 +210,7 @@ Symbol SymbolTable::GeneratePutSymbol(std::string id, int type, Symbol args, llv
     {
         llvmType = llvm::FunctionType::get(llvmBuilder->getInt1Ty(), llvmArgType, false);
     }
-    procedure = llvm::Function::Create(llvmType, llvm::Function::ExternalLinkage, put.GetId(), llvmModule);
+    llvm::Function *procedure = llvm::Function::Create(llvmType, llvm::Function::ExternalLinkage, put.GetId(), llvmModule);
     put.SetLLVMFunction(procedure);
 
     return put;
@@ -220,16 +219,13 @@ Symbol SymbolTable::GeneratePutSymbol(std::string id, int type, Symbol args, llv
 Symbol SymbolTable::GenerateGetSymbol(std::string id, int type, llvm::Module *llvmModule,
                                       llvm::IRBuilder<> *llvmBuilder, llvm::Type *llvmTy)
 {
-    llvm::FunctionType *llvmType = nullptr;
-    llvm::Function *procedure = nullptr;
-
     Symbol get;
     get.SetId(id);
     get.SetType(type);
     get.SetIsGlobal(true);
     get.SetDeclarationType(T_PROCEDURE);
-    llvmType = llvm::FunctionType::get(llvmTy, {},false);
-    procedure = llvm::Function::Create(llvmType, llvm::Function::ExternalLinkage, get.GetId(), llvmModule);
+    llvm::FunctionType *llvmType = llvm::FunctionType::get(llvmTy, {},false);
+    llvm::Function *procedure = llvm::Function::Create(llvmType, llvm::Function::ExternalLinkage, get.GetId(), llvmModule);
     get.SetLLVMFunction(procedure);
 
     return get;

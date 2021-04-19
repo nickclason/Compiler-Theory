@@ -70,7 +70,6 @@ char* GETSTRING()
 
     // char *string = "A";
     // return string;
-
 }
 
 float SQRT(int num)
