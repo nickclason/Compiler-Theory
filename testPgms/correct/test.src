@@ -1,17 +1,9 @@
 program test is
     variable str : string;
     variable tmp : bool;
-    variable arr : integer[3];
 
-    procedure strTest : integer()
-        variable newStr : string;
-        begin
-            newStr := "Banb";
-            return 0;
-    end procedure;
 begin
-    //str := getString();
-    str := "A";
+    str := getString();
 
     if (str == "A") then
         tmp := putString("T");
