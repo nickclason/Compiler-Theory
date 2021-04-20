@@ -1,16 +1,15 @@
 program test is
-    variable str : string;
-    variable str2 : string;
+    variable x : integer;
+    variable y : bool;
+
     variable tmp : bool;
 begin
+    x := 1;
 
-    str := getString();
-    str2 := "A";
+    y := x;
 
-    tmp := putString("Str: ");
-    tmp := putString(str);
-    tmp := putString("");
-    tmp := putString("Str2: ");
-    tmp := putString(str2);
 
+    tmp := putInteger(x);
+    tmp := putBool(y);
+    tmp := putBool(0);
 end program.

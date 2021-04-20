@@ -457,7 +457,6 @@ void Parser::VariableDeclaration(Symbol &variable)
             globalTy = GetLLVMType(variable);
         }
 
-        // I might reconsider using actual GlobalVariables. It is causing some kind of issue for global arrays
         llvm::Constant *constInit = llvm::Constant::getNullValue(globalTy);
         llvm::Value *val = new llvm::GlobalVariable(*llvmModule, globalTy, false, llvm::GlobalValue::CommonLinkage, constInit, variable.GetId());
         variable.SetIsInitialized(true);
@@ -882,7 +881,7 @@ void Parser::IfStatement()
     if (expr.GetType() == T_INTEGER)
     {
         ReportWarning("Converting integer to boolean");
-        llvm::Value *val = ConvertIntToBool(expr.GetLLVMValue());
+        llvm::Value *val = llvmBuilder->CreateICmpNE(expr.GetLLVMValue(), llvm::ConstantInt::get(llvm::Type::getInt32Ty(llvmContext), 0, true));
         expr.SetLLVMValue(val);
     }
     else if (expr.GetType() != T_BOOL)
@@ -1008,7 +1007,7 @@ void Parser::LoopStatement()
     if (expr.GetType() == T_INTEGER)
     {
         ReportWarning("Converting integer to boolean");
-        llvm::Value *val = ConvertIntToBool(expr.GetLLVMValue());
+        llvm::Value *val = llvmBuilder->CreateICmpNE(expr.GetLLVMValue(), llvm::ConstantInt::get(llvm::Type::getInt32Ty(llvmContext), 0, true));
         expr.SetLLVMValue(val);
     }
     else if (expr.GetType() != T_BOOL)
@@ -1194,7 +1193,8 @@ void Parser::AssignmentTypeCheck(Symbol dest, Symbol expr, token_t *token, Symbo
         isDiff = false;
         expr.SetType(T_BOOL);
         ReportWarning("Converting int to bool");
-        expr.SetLLVMValue(ConvertIntToBool(expr.GetLLVMValue()));
+        llvm::Value *val = llvmBuilder->CreateICmpNE(expr.GetLLVMValue(), llvm::ConstantInt::get(llvm::Type::getInt32Ty(llvmContext), 0, true));
+        expr.SetLLVMValue(val);
     }
 
     if (dest.GetType() == T_INTEGER)
@@ -1250,7 +1250,6 @@ Symbol Parser::Destination()
     if (!dest.IsValid())
     {
         ReportError("Symbol: " + id + " not found");
-//        out.CopySymbol(dest);
         return dest;
     }
 
@@ -1322,7 +1321,6 @@ Symbol Parser::Destination()
     }
 
     // If we get here, the destination is valid
-//    out.CopySymbol(dest);
     return dest;
 }
 
@@ -2269,22 +2267,9 @@ llvm::Type *Parser::GetLLVMType(Symbol symbol)
         case T_STRING:
             return llvmBuilder->getInt8PtrTy();
         default:
-            return llvm::IntegerType::getInt1Ty(llvmModule->getContext());
+            ReportError("Not a valid type");
+            return nullptr;
     }
-}
-
-// Helper function for performing int->bool type conversion
-llvm::Value *Parser::ConvertIntToBool(llvm::Value *intVal)
-{
-    llvm::Value *zero = llvm::ConstantInt::getIntegerValue(llvmBuilder->getInt32Ty(), llvm::APInt(32, 0, true));
-    llvm::Value *cmp = llvmBuilder->CreateICmpEQ(intVal, zero);
-
-    llvm::Value *true_ = llvm::ConstantInt::getIntegerValue(llvmBuilder->getInt1Ty(), llvm::APInt(1, 1, true));
-    llvm::Value *false_ = llvm::ConstantInt::getIntegerValue(llvmBuilder->getInt1Ty(), llvm::APInt(1, 0, true));
-
-    llvm::Value *boolVal = llvmBuilder->CreateSelect(cmp, false_, true_);
-
-    return boolVal;
 }
 
 // Helper function for performing string comparisions

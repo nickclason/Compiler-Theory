@@ -37,8 +37,7 @@ float GETFLOAT()
 
 bool PUTBOOL(bool val)
 {
-    val ? printf("true") : printf("false");
-//    printf("%i\n", val);
+    val ? printf("true\n") : printf("false\n");
     return true;
 }
 
@@ -57,7 +56,7 @@ bool PUTSTRING(char *str)
 
 char* GETSTRING()
 {
-    int max_length = 3;
+    int max_length = 256;
     char *string = malloc(max_length * sizeof(char));
     scanf("%s", string);
 
