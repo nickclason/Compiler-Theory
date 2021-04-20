@@ -37,7 +37,7 @@ float GETFLOAT()
 
 bool PUTBOOL(bool val)
 {
-    val ? printf("true\n") : printf("false\n");
+    printf("%d\n", val);
     return true;
 }
 

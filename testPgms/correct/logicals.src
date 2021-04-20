@@ -4,6 +4,10 @@ global variable x : bool;
 global variable c : string;
 global variable tmp : bool;
 
+//global variable i : integer; // my change
+//global variable arr : integer[256];
+global variable str : string;
+
 begin
 
 x := getBool();
@@ -14,6 +18,8 @@ else
 end if;
 
 c := getString();
+str := "A";
+
 if(c == "A") then
 	tmp := putString("T");
 else
