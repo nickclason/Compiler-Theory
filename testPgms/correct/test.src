@@ -1,15 +1,26 @@
 program test is
 
-    global variable globalString : string;
     variable tmp : bool;
+
+    variable x : integer;
+    variable y : integer;
+
+    procedure test : integer()
+        variable z : integer;
+        begin
+            z := 1;
+            return z;
+    end procedure;
+
+    variable arr : integer[3];
+
 begin
+    arr[0] := 1;
+    arr[1] := 2;
+    arr[2] := 3;
 
-    globalString := "A";
-    //globalString := getString();
+    x := -test();
+    y := 1 - x;
+    tmp := putInteger(arr[1-x]);
 
-    if (globalString == "A") then
-        tmp := putString("T");
-    else
-        tmp := putString("F");
-    end if;
 end program.

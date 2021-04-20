@@ -2288,11 +2288,11 @@ llvm::Value* Parser::DoStringComp(Symbol term, Symbol relation, token_t *op, llv
     // Get the character
     llvm::Value *termAddr = llvmBuilder->CreateGEP(term.GetLLVMValue(), idx);
     llvm::Value *termChar = llvmBuilder->CreateLoad(llvmBuilder->getInt8PtrTy(), termAddr);
-    llvm::Value *tailAddr = llvmBuilder->CreateGEP(relation.GetLLVMValue(), idx);
-    llvm::Value *tailChar = llvmBuilder->CreateLoad(llvmBuilder->getInt8PtrTy(), tailAddr);
+    llvm::Value *relAddr = llvmBuilder->CreateGEP(relation.GetLLVMValue(), idx);
+    llvm::Value *relChar = llvmBuilder->CreateLoad(llvmBuilder->getInt8PtrTy(), relAddr);
 
     // Do the comparison
-    llvm::Value *cmp = llvmBuilder->CreateICmpEQ(termChar, tailChar);
+    llvm::Value *cmp = llvmBuilder->CreateICmpEQ(termChar, relChar);
 
     // check that strings are still going
     llvm::Value *zero = llvm::ConstantInt::getIntegerValue(llvmBuilder->getInt8PtrTy(), llvm::APInt(8, 0, true));
