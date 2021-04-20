@@ -457,20 +457,21 @@ void Parser::VariableDeclaration(Symbol &variable)
             globalTy = GetLLVMType(variable);
         }
 
-        llvm::Constant *constInit = llvm::Constant::getNullValue(globalTy);
-        llvm::Value *val = new llvm::GlobalVariable(*llvmModule, globalTy, false, llvm::GlobalValue::CommonLinkage, constInit, variable.GetId());
+        llvm::GlobalVariable *globalVar = new llvm::GlobalVariable(*llvmModule, globalTy, false,
+                                                                   llvm::GlobalValue::CommonLinkage,
+                                                                   llvm::Constant::getNullValue(globalTy), variable.GetId());
         variable.SetIsInitialized(true);
 
         // Array
         if (variable.IsArray())
         {
-            variable.SetLLVMArrayAddress(val);
-            llvm::Value *size = llvm::ConstantInt::getIntegerValue(llvmBuilder->getInt32Ty(), llvm::APInt(32, variable.GetArraySize(), true));
+            variable.SetLLVMArrayAddress(globalVar);
+            llvm::Constant *size = llvm::ConstantInt::getIntegerValue(llvmBuilder->getInt32Ty(), llvm::APInt(32, variable.GetArraySize(), true));
             variable.SetLLVMArraySize(size);
         }
         else
         {
-            variable.SetLLVMAddress(val);
+            variable.SetLLVMAddress(globalVar);
         }
     }
 
@@ -518,8 +519,7 @@ void Parser::ProcedureDeclaration(Symbol &procedure)
 
     // Create the function for llvm
     llvm::FunctionType *procType = llvm::FunctionType::get(GetLLVMType(procedure), parameters, false);
-    llvm::FunctionCallee procCallee = llvmModule->getOrInsertFunction("function" + std::to_string(procedureCount), procType);
-    auto *proc = llvm::dyn_cast<llvm::Constant>(procCallee.getCallee());
+    auto *proc = llvm::dyn_cast<llvm::Constant>(llvmModule->getOrInsertFunction("function" + std::to_string(procedureCount), procType).getCallee());
     procedureCount++;
 
     auto *func = llvm::cast<llvm::Function>(proc);
@@ -626,22 +626,18 @@ void Parser::ProcedureBody()
             continue;
         }
 
-        llvm::Value *address = nullptr;
-
         // Array
         if (it.second.IsArray())
         {
             llvm::Value *size = llvm::ConstantInt::getIntegerValue(llvmBuilder->getInt32Ty(), llvm::APInt(32, it.second.GetArraySize(), true));
             it.second.SetLLVMArraySize(size);
 
-            address = llvmBuilder->CreateAlloca(GetLLVMType(it.second), size);
-            it.second.SetLLVMArrayAddress(address);
+            it.second.SetLLVMArrayAddress(llvmBuilder->CreateAlloca(GetLLVMType(it.second), size));
             it.second.SetIsInitialized(true);
         }
         else
         {
-            address = llvmBuilder->CreateAlloca(GetLLVMType(it.second));
-            it.second.SetLLVMAddress(address);
+            it.second.SetLLVMAddress(llvmBuilder->CreateAlloca(GetLLVMType(it.second)));
         }
 
         symbolTable.AddSymbol(it.second);
@@ -693,9 +689,6 @@ void Parser::ProcedureBody()
 
     if (llvmBuilder->GetInsertBlock()->getTerminator() == nullptr)
     {
-        // llvmBuilder->CreateRet(retVal);
-        // llvm::Constant *retVal = llvm::ConstantInt::getIntegerValue(llvmBuilder->getInt32Ty(), llvm::APInt(32, 0, true));
-
         // Force procedures to have returns
         ReportError("Procedure is required to have a return value.");
         return;
