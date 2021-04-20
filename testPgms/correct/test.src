@@ -1,11 +1,13 @@
 program test is
-    variable str : string;
+
+    global variable globalString : string;
     variable tmp : bool;
-
 begin
-    str := getString();
 
-    if (str == "A") then
+    globalString := "A";
+    //globalString := getString();
+
+    if (globalString == "A") then
         tmp := putString("T");
     else
         tmp := putString("F");
