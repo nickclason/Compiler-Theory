@@ -14,8 +14,7 @@ else
 end if;
 
 c := getString();
-tmp := putString(c);
-if(c == "G") then
+if(c == "A") then
 	tmp := putString("T");
 else
 	tmp := putString("F");
