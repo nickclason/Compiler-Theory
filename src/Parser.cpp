@@ -918,7 +918,7 @@ void Parser::IfStatement()
 
     if (token->type == T_ELSE)
     {
-        endBlock = llvm::BasicBlock::Create(llvmContext, "", llvmCurrProc);
+        endBlock = llvm::BasicBlock::Create(llvmContext, "endIf", llvmCurrProc);
 
         if (llvmBuilder->GetInsertBlock()->getTerminator() == nullptr)
         {
@@ -990,9 +990,9 @@ void Parser::LoopStatement()
         return;
     }
 
-    llvm::BasicBlock *loopStart = llvm::BasicBlock::Create(llvmContext, "start", llvmCurrProc);
-    llvm::BasicBlock *loopBody = llvm::BasicBlock::Create(llvmContext, "body", llvmCurrProc); // (<statement>;)*
-    llvm::BasicBlock *loopEnd = llvm::BasicBlock::Create(llvmContext,"end", llvmCurrProc);
+    llvm::BasicBlock *loopStart = llvm::BasicBlock::Create(llvmContext, "loopStart", llvmCurrProc);
+    llvm::BasicBlock *loopBody = llvm::BasicBlock::Create(llvmContext, "loopBody", llvmCurrProc); // (<statement>;)*
+    llvm::BasicBlock *loopEnd = llvm::BasicBlock::Create(llvmContext,"loopEnd", llvmCurrProc);
 
     // jump to start
     llvmBuilder->CreateBr(loopStart);
@@ -1287,9 +1287,9 @@ Symbol Parser::Destination()
             llvmBuilder->CreateStore(unrollIdx, unrollIdxAddress);
 
             // Blocks for unrolling loop
-            unrollLoopStart = llvm::BasicBlock::Create(llvmContext, "", llvmCurrProc);
-            llvm::BasicBlock *unrollLoopBody = llvm::BasicBlock::Create(llvmContext, "", llvmCurrProc);
-            unrollLoopEnd = llvm::BasicBlock::Create(llvmContext, "", llvmCurrProc);
+            unrollLoopStart = llvm::BasicBlock::Create(llvmContext, "unrollLoopStart", llvmCurrProc);
+            llvm::BasicBlock *unrollLoopBody = llvm::BasicBlock::Create(llvmContext, "unrollLoopBody", llvmCurrProc);
+            unrollLoopEnd = llvm::BasicBlock::Create(llvmContext, "unrollLoopEnd", llvmCurrProc);
 
             // Jump to the loop start and load index
             llvmBuilder->CreateBr(unrollLoopStart);
@@ -2295,8 +2295,8 @@ llvm::Value* Parser::DoStringComp(Symbol term, Symbol relation, token_t *op, llv
     llvm::Value *idx = llvm::ConstantInt::getIntegerValue(llvmBuilder->getInt32Ty(), llvm::APInt(32, 0, true));
     llvmBuilder->CreateStore(idx, idxAddr);
 
-    llvm::BasicBlock *strCmpStart = llvm::BasicBlock::Create(llvmContext, "", llvmCurrProc);
-    llvm::BasicBlock *strCmpEnd = llvm::BasicBlock::Create(llvmContext, "", llvmCurrProc);
+    llvm::BasicBlock *strCmpStart = llvm::BasicBlock::Create(llvmContext, "strCmpStart", llvmCurrProc);
+    llvm::BasicBlock *strCmpEnd = llvm::BasicBlock::Create(llvmContext, "strCmpEnd", llvmCurrProc);
 
     // jump to the loop start
     llvmBuilder->CreateBr(strCmpStart);
