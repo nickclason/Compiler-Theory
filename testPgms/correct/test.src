@@ -1,15 +1,21 @@
 program test is
-    variable x : integer;
-    variable y : bool;
-
+    variable str : string;
     variable tmp : bool;
+    variable arr : integer[3];
+
+    procedure strTest : integer()
+        variable newStr : string;
+        begin
+            newStr := "Banb";
+            return 0;
+    end procedure;
 begin
-    x := 1;
+    //str := getString();
+    str := "A";
 
-    y := x;
-
-
-    tmp := putInteger(x);
-    tmp := putBool(y);
-    tmp := putBool(0);
+    if (str == "A") then
+        tmp := putString("T");
+    else
+        tmp := putString("F");
+    end if;
 end program.

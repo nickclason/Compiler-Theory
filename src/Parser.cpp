@@ -1152,7 +1152,6 @@ void Parser::IndexArray(Symbol symbol, Symbol &out)
         llvm::Value *address = nullptr;
         if (symbol.IsGlobal())
         {
-            // global arrays are weird and this might not even work properly
             llvm::Value *vals[] = {zero, idx.GetLLVMValue()};
             address = llvmBuilder->CreateInBoundsGEP(symbol.GetLLVMArrayAddress(), vals);
         }
