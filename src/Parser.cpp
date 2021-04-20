@@ -354,7 +354,8 @@ void Parser::Declarations()
 
         if (errorFlag)
         {
-            // TODO: resync
+            // TODO: resync i don't get the point of this
+            return;
         }
         else
         {
@@ -762,7 +763,7 @@ void Parser::Statements(int terminators[], int terminatorsSize)
 
         if (errorFlag)
         {
-            // TODO: resync
+            // TODO: resync i don't get the point of this
             return;
         }
         else
