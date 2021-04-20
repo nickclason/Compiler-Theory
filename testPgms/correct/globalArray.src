@@ -4,19 +4,6 @@ program test is
     variable i : integer;
     variable tmp : bool;
 
-    procedure test : integer()
-        variable myArr : integer[3];
-        begin
-            myArr[0] := 1;
-            myArr[1] := 2;
-            myArr[2] := 3;
-            myArr := myArr * 2;
-            for (i := 0; i < 3)
-                tmp := putInteger(myArr[i]);
-                i := i + 1;
-            end for;
-        return 1;
-    end procedure;
 begin
     arr[0] := 1;
     arr[1] := 2;

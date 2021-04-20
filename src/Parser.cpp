@@ -5,6 +5,7 @@
 // TODO: Global arrays don't work properly when operating on entire array.
 // TODO: Resync ?
 // TODO: getString doesn't work properly, string comparisons get fucked
+// TODO: are string lengths the problem........
 
 
 #include "../include/Parser.h"
@@ -989,13 +990,9 @@ void Parser::LoopStatement()
         return;
     }
 
-    llvm::BasicBlock *loopStart = nullptr;
-    llvm::BasicBlock *loopBody = nullptr; // (<statement>;)*
-    llvm::BasicBlock *loopEnd = nullptr;
-
-    loopStart = llvm::BasicBlock::Create(llvmContext,"", llvmCurrProc);
-    loopBody = llvm::BasicBlock::Create(llvmContext,"", llvmCurrProc);
-    loopEnd = llvm::BasicBlock::Create(llvmContext,"", llvmCurrProc);
+    llvm::BasicBlock *loopStart = llvm::BasicBlock::Create(llvmContext, "start", llvmCurrProc);
+    llvm::BasicBlock *loopBody = llvm::BasicBlock::Create(llvmContext, "body", llvmCurrProc); // (<statement>;)*
+    llvm::BasicBlock *loopEnd = llvm::BasicBlock::Create(llvmContext,"end", llvmCurrProc);
 
     // jump to start
     llvmBuilder->CreateBr(loopStart);

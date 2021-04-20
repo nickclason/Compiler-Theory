@@ -57,10 +57,10 @@ bool PUTSTRING(char *str)
 
 char* GETSTRING()
 {
-    int max_length = 256;
+    int max_length = 3;
     char *string = malloc(max_length * sizeof(char));
     scanf("%s", string);
-    string[strlen(string) - 1] = '\0';
+
     return string;
 
     //  So for some reason, when you hard code in the string, string comparisons work (str == "A")
@@ -70,6 +70,7 @@ char* GETSTRING()
 
     // char *string = "A";
     // return string;
+
 }
 
 float SQRT(int num)
