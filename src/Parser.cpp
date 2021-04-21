@@ -185,7 +185,8 @@ void Parser::ProgramBody()
     }
 
     // Need somewhere to put everything, call it main
-    llvm::FunctionType *type = llvm::FunctionType::get(llvmBuilder->getInt32Ty(), std::vector<llvm::Type *>(), false);
+    llvm::IntegerType *intType = llvmBuilder->getInt32Ty();
+    llvm::FunctionType *type = llvm::FunctionType::get(intType, std::vector<llvm::Type *>(), false);
     llvm::FunctionCallee mainCallee = llvmModule->getOrInsertFunction("main", type);
     auto *main = llvm::dyn_cast<llvm::Constant>(mainCallee.getCallee());
     llvmCurrProc = llvm::cast<llvm::Function>(main);
@@ -215,7 +216,6 @@ void Parser::ProgramBody()
     // Always return an integer (0), because according to the way the language is defined, you can have a return
     // statement in the program body but we don't really want to do anything with it.
 
-    llvm::IntegerType *intType = llvmBuilder->getInt32Ty();
     llvm::APInt retInt = llvm::APInt(32, 0, true);
     llvm::Constant *retVal = llvm::ConstantInt::getIntegerValue(intType, retInt);
     llvmBuilder->CreateRet(retVal);
@@ -889,7 +889,7 @@ void Parser::IfStatement()
     if (expr.GetType() == T_INTEGER)
     {
         ReportWarning("Converting integer to boolean");
-        llvm::Value *val = llvmBuilder->CreateICmpNE(expr.GetLLVMValue(), llvm::ConstantInt::get(llvm::Type::getInt32Ty(llvmContext), 0, true));
+        llvm::Value *val = llvmBuilder->CreateICmpNE(expr.GetLLVMValue(), llvm::ConstantInt::get(llvmBuilder->getInt32Ty(), 0, true));
         expr.SetLLVMValue(val);
     }
     else if (expr.GetType() != T_BOOL)
@@ -1015,7 +1015,7 @@ void Parser::LoopStatement()
     if (expr.GetType() == T_INTEGER)
     {
         ReportWarning("Converting integer to boolean");
-        llvm::Value *val = llvmBuilder->CreateICmpNE(expr.GetLLVMValue(), llvm::ConstantInt::get(llvm::Type::getInt32Ty(llvmContext), 0, true));
+        llvm::Value *val = llvmBuilder->CreateICmpNE(expr.GetLLVMValue(), llvm::ConstantInt::get(llvmBuilder->getInt32Ty(), 0, true));
         expr.SetLLVMValue(val);
     }
     else if (expr.GetType() != T_BOOL)
@@ -1199,6 +1199,7 @@ void Parser::AssignmentTypeCheck(Symbol dest, Symbol expr, token_t *token, Symbo
     }
 
     bool isDiff = true;
+    llvm::IntegerType *intType = llvmBuilder->getInt32Ty();
 
     // int -> bool
     if (dest.GetType() == T_BOOL && expr.GetType() == T_INTEGER)
@@ -1206,19 +1207,20 @@ void Parser::AssignmentTypeCheck(Symbol dest, Symbol expr, token_t *token, Symbo
         isDiff = false;
         expr.SetType(T_BOOL);
         ReportWarning("Converting int to bool");
-        llvm::Value *val = llvmBuilder->CreateICmpNE(expr.GetLLVMValue(), llvm::ConstantInt::get(llvm::Type::getInt32Ty(llvmContext), 0, true));
+        llvm::Value *val = llvmBuilder->CreateICmpNE(expr.GetLLVMValue(), llvm::ConstantInt::get(intType, 0, true));
         expr.SetLLVMValue(val);
     }
 
     if (dest.GetType() == T_INTEGER)
     {
         // bool -> int
+
         if (expr.GetType() == T_BOOL)
         {
             expr.SetType(T_INTEGER);
             isDiff = false;
             ReportWarning("Converting bool to int");
-            llvm::Value *val = llvmBuilder->CreateZExtOrTrunc(expr.GetLLVMValue(), llvmBuilder->getInt32Ty());
+            llvm::Value *val = llvmBuilder->CreateZExtOrTrunc(expr.GetLLVMValue(), intType);
             expr.SetLLVMValue(val);
         }
         else if (expr.GetType() == T_FLOAT) // float -> int
@@ -1226,7 +1228,7 @@ void Parser::AssignmentTypeCheck(Symbol dest, Symbol expr, token_t *token, Symbo
             expr.SetType(T_INTEGER);
             isDiff = false;
             ReportWarning("Converting float to int");
-            llvm::Value *val = llvmBuilder->CreateFPToSI(expr.GetLLVMValue(), llvmBuilder->getInt32Ty());
+            llvm::Value *val = llvmBuilder->CreateFPToSI(expr.GetLLVMValue(), intType);
             expr.SetLLVMValue(val);
         }
     }
@@ -2318,10 +2320,8 @@ llvm::Value* Parser::DoStringComp(Symbol term, Symbol relation, token_t *op, llv
     llvmBuilder->CreateStore(idx, idxAddr);
 
     // Get the character
-    llvm::Value *termAddr = llvmBuilder->CreateGEP(term.GetLLVMValue(), idx);
-    llvm::Value *termChar = llvmBuilder->CreateLoad(llvmBuilder->getInt8PtrTy(), termAddr);
-    llvm::Value *relAddr = llvmBuilder->CreateGEP(relation.GetLLVMValue(), idx);
-    llvm::Value *relChar = llvmBuilder->CreateLoad(llvmBuilder->getInt8PtrTy(), relAddr);
+    llvm::Value *termChar = llvmBuilder->CreateLoad(llvmBuilder->getInt8PtrTy(), llvmBuilder->CreateGEP(term.GetLLVMValue(), idx));
+    llvm::Value *relChar = llvmBuilder->CreateLoad(llvmBuilder->getInt8PtrTy(), llvmBuilder->CreateGEP(relation.GetLLVMValue(), idx));
 
     // Do the comparison
     llvm::Value *cmp = llvmBuilder->CreateICmpEQ(termChar, relChar);
@@ -2334,14 +2334,8 @@ llvm::Value* Parser::DoStringComp(Symbol term, Symbol relation, token_t *op, llv
     llvmBuilder->CreateCondBr(cont, strCmpStart, strCmpEnd);
     llvmBuilder->SetInsertPoint(strCmpEnd);
 
-    if (op->type == T_EQEQ)
-    {
-        val = cmp;
-    }
-    else
-    {
-        val = llvmBuilder->CreateNot(cmp);
-    }
+    bool isEQEQ = (op->type == T_EQEQ);
+    isEQEQ ? val = cmp : val = llvmBuilder->CreateNot(cmp);
 
     return val;
 }
