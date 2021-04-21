@@ -106,7 +106,6 @@ private:
     std::vector<llvm::Value *> ArgumentList(std::vector<Symbol>::iterator curr, std::vector<Symbol>::iterator end);
 
     llvm::Type* GetLLVMType(Symbol symbol);
-    llvm::Value* DoStringComp(Symbol term, Symbol Relation, token_t *op, llvm::Value *val);
 };
 
 #endif //COMPILER_THEORY_PARSER_H
