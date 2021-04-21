@@ -4,9 +4,7 @@
 
 // TODO: Global arrays don't work properly when operating on entire array.
 // TODO: Resync ?
-// TODO: getString doesn't work properly, string comparisons get fucked
-// TODO: are string lengths the problem........
-// TODO: replace llvmBuilder->getInt32ty with a single variable that calls it
+
 
 #include "../include/Parser.h"
 
