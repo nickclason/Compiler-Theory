@@ -1,26 +1,41 @@
 program test is
 
+    variable lhsStr : string;
+    variable rhsStr : string;
+
     variable tmp : bool;
 
-    variable x : integer;
-    variable y : integer;
-
-    procedure test : integer()
-        variable z : integer;
-        begin
-            z := 1;
-            return z;
-    end procedure;
-
-    variable arr : integer[3];
-
 begin
-    arr[0] := 1;
-    arr[1] := 2;
-    arr[2] := 3;
 
-    x := -test();
-    y := 1 - x;
-    tmp := putInteger(arr[1-x]);
+    //lhsStr := "Apple";
+    //rhsStr := "Apple";
+
+    lhsStr := getString();
+    rhsStr := "Apple";
+
+    if (lhsStr == rhsStr) then
+        tmp := putInteger(1);
+    else
+        tmp := putInteger(0);
+    end if;
 
 end program.
+
+
+// Notes
+
+// Comparing these 2 strings works
+// lhsStr := "Apple";
+// rhsStr := "Apple";
+
+// Comparing these 2 strings works
+// lhsStr := getString();
+// rhsStr := getString();
+
+// Comparing these 2 strings DOES NOT work
+// lhs := "Apple";
+// rhs := getString();
+
+// Comparing these 2 strings DOES NOT work
+// lhs := getString();
+// rhs := "Apple";

@@ -460,6 +460,8 @@ void Parser::VariableDeclaration(Symbol &variable)
             globalTy = GetLLVMType(variable);
         }
 
+
+
         llvm::GlobalVariable *globalVar = new llvm::GlobalVariable(*llvmModule, globalTy, false,
                                                                    llvm::GlobalValue::CommonLinkage,
                                                                    llvm::Constant::getNullValue(globalTy), variable.GetId());
@@ -1763,7 +1765,57 @@ void Parser::RelationTypeCheck(Symbol expectedType, Symbol term, Symbol relation
         llvm::Value *val ;
         if (term.GetType() == T_STRING)
         {
-            val = DoStringComp(term, relation_, op, val);
+            llvm::IntegerType *intType = llvmBuilder->getInt32Ty();
+            llvm::APInt zeroAPInt = llvm::APInt(32, 0, true);
+            llvm::APInt oneAPInt = llvm::APInt(32, 1, true);
+
+            llvm::Value *idxAddr = llvmBuilder->CreateAlloca(intType);
+            llvm::Value *idx = llvm::ConstantInt::getIntegerValue(intType, zeroAPInt);
+            llvmBuilder->CreateStore(idx, idxAddr);
+
+            llvm::BasicBlock *strCmpStart = llvm::BasicBlock::Create(llvmContext, "strCmpStart", llvmCurrProc);
+            llvm::BasicBlock *strCmpEnd = llvm::BasicBlock::Create(llvmContext, "strCmpEnd", llvmCurrProc);
+
+            // jump to the loop start
+            llvmBuilder->CreateBr(strCmpStart);
+            llvmBuilder->SetInsertPoint(strCmpStart);
+
+            llvm::Value *one = llvm::ConstantInt::getIntegerValue(intType, oneAPInt);
+            idx = llvmBuilder->CreateLoad(intType, idxAddr);
+            idx = llvmBuilder->CreateBinOp(llvm::Instruction::Add, idx, one);
+            llvmBuilder->CreateStore(idx, idxAddr);
+
+            // ******* This block works *******
+            // Breaking it down to the simplest form, Compare only the first character of each string
+            // This revealed that I was attempting to load an i8* using the result of GEP, when this should
+            // in fact have just loaded an i8. Much time was wasted.
+            //
+            // Get address of the idx'th element in each string
+            auto lhsAddress = llvmBuilder->CreateGEP(term.GetLLVMValue(), idx);
+            auto rhsAddress = llvmBuilder->CreateGEP(relation_.GetLLVMValue(), idx);
+
+            // Get character at 'idx' from each string, you have to create the load with i8 and not i8*
+            // as i found out after 2 weeks of trying to fix string comparison.
+            llvm::Value *lhsCharacter = llvmBuilder->CreateLoad(llvmBuilder->getInt8Ty(), lhsAddress);
+            llvm::Value *rhsCharacter = llvmBuilder->CreateLoad(llvmBuilder->getInt8Ty(), rhsAddress);
+
+            // compare the first character of lhs and rhs
+            llvm::Value *stringComparison = llvmBuilder->CreateICmpEQ(lhsCharacter, rhsCharacter);
+            // ******* This block works *******
+
+            // escCh = '\0'
+            llvm::Value *escCh = llvm::ConstantInt::getIntegerValue(llvmBuilder->getInt8Ty(), llvm::APInt(8, 0, true));
+            llvm::Value *notDone = llvmBuilder->CreateICmpNE(lhsCharacter, escCh);
+
+            // Prev char's match and prev lhsChar was not esc char '\0', then continue
+            llvm::Value *keepGoing = llvmBuilder->CreateAnd(stringComparison, notDone);
+            llvmBuilder->CreateCondBr(keepGoing, strCmpStart, strCmpEnd);
+
+            // end
+            llvmBuilder->SetInsertPoint(strCmpEnd);
+
+            bool isEQEQ = (op->type == T_EQEQ);
+            isEQEQ ? val = stringComparison : val = llvmBuilder->CreateNot(stringComparison);
         }
         else
         {
@@ -2293,49 +2345,4 @@ llvm::Type *Parser::GetLLVMType(Symbol symbol)
             ReportError("Not a valid type");
             return nullptr;
     }
-}
-
-// Helper function for performing string comparisions
-llvm::Value* Parser::DoStringComp(Symbol term, Symbol relation, token_t *op, llvm::Value* val)
-{
-    // create a loop to compare strings
-    llvm::IntegerType *intType = llvmBuilder->getInt32Ty();
-    llvm::APInt zeroAPInt = llvm::APInt(32, 0, true);
-    llvm::APInt oneAPInt = llvm::APInt(32, 1, true);
-
-    llvm::Value *idxAddr = llvmBuilder->CreateAlloca(intType);
-    llvm::Value *idx = llvm::ConstantInt::getIntegerValue(intType, zeroAPInt);
-    llvmBuilder->CreateStore(idx, idxAddr);
-
-    llvm::BasicBlock *strCmpStart = llvm::BasicBlock::Create(llvmContext, "strCmpStart", llvmCurrProc);
-    llvm::BasicBlock *strCmpEnd = llvm::BasicBlock::Create(llvmContext, "strCmpEnd", llvmCurrProc);
-
-    // jump to the loop start
-    llvmBuilder->CreateBr(strCmpStart);
-    llvmBuilder->SetInsertPoint(strCmpStart);
-
-    llvm::Value *one = llvm::ConstantInt::getIntegerValue(intType, oneAPInt);
-    idx = llvmBuilder->CreateLoad(intType, idxAddr);
-    idx = llvmBuilder->CreateBinOp(llvm::Instruction::Add, idx, one);
-    llvmBuilder->CreateStore(idx, idxAddr);
-
-    // Get the character
-    llvm::Value *termChar = llvmBuilder->CreateLoad(llvmBuilder->getInt8PtrTy(), llvmBuilder->CreateGEP(term.GetLLVMValue(), idx));
-    llvm::Value *relChar = llvmBuilder->CreateLoad(llvmBuilder->getInt8PtrTy(), llvmBuilder->CreateGEP(relation.GetLLVMValue(), idx));
-
-    // Do the comparison
-    llvm::Value *cmp = llvmBuilder->CreateICmpEQ(termChar, relChar);
-
-    // check that strings are still going
-    llvm::Value *zero = llvm::ConstantInt::getIntegerValue(llvmBuilder->getInt8PtrTy(), llvm::APInt(8, 0, true));
-    llvm::Value *noEnd = llvmBuilder->CreateICmpNE(termChar, zero);
-    llvm::Value *cont = llvmBuilder->CreateAnd(cmp, noEnd);
-
-    llvmBuilder->CreateCondBr(cont, strCmpStart, strCmpEnd);
-    llvmBuilder->SetInsertPoint(strCmpEnd);
-
-    bool isEQEQ = (op->type == T_EQEQ);
-    isEQEQ ? val = cmp : val = llvmBuilder->CreateNot(cmp);
-
-    return val;
 }
