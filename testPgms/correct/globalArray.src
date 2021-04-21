@@ -1,28 +1,9 @@
 program test is
     variable arr : integer[3];
-    variable arr2 : integer[3];
-    variable i : integer;
-    variable tmp : bool;
+    variable str : string;
 
 begin
-    arr[0] := 1;
-    arr[1] := 2;
-    arr[2] := 3;
 
-    arr2[0] := 1;
-    arr2[1] := 2;
-    arr2[2] := 3;
-
-    //arr := arr2 * 2; // no
-    arr := arr * 2; // no
-    //arr := 69; // yes
-
-    for (i := 0; i < 3)
-        tmp := putInteger(arr[i]);
-        i := i + 1;
-    end for;
-
-    tmp := putString("");
-
+    str := getString();
 
 end program .
