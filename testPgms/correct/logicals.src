@@ -13,8 +13,8 @@ else
 	tmp := putString("F");
 end if;
 
-//c := getString();
-c := "A";
+c := getString();
+
 if(c == "A") then
 	tmp := putString("T");
 else
