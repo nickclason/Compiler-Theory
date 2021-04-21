@@ -1764,11 +1764,15 @@ void Parser::RelationTypeCheck(Symbol expectedType, Symbol term, Symbol relation
         if (term.GetType() == T_STRING)
         {
             llvm::IntegerType *intType = llvmBuilder->getInt32Ty();
-            llvm::APInt zeroAPInt = llvm::APInt(32, 0, true);
             llvm::APInt oneAPInt = llvm::APInt(32, 1, true);
 
+            // Need to start at -1 because the Add instruction was incrementing the idx before we ever got
+            // to check the first character. This created issues for single character comparisons and the first
+            // character of all strings was actually never being checked, leading to incorrect comparisons.
+            //
             llvm::Value *idxAddr = llvmBuilder->CreateAlloca(intType);
-            llvm::Value *idx = llvm::ConstantInt::getIntegerValue(intType, zeroAPInt);
+            llvm::Value *idx = llvm::ConstantInt::getIntegerValue(intType, llvm::APInt(32, -1, true));
+
             llvmBuilder->CreateStore(idx, idxAddr);
 
             llvm::BasicBlock *strCmpStart = llvm::BasicBlock::Create(llvmContext, "strCmpStart", llvmCurrProc);
