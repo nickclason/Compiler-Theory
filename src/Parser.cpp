@@ -6,7 +6,7 @@
 // TODO: Resync ?
 // TODO: getString doesn't work properly, string comparisons get fucked
 // TODO: are string lengths the problem........
-
+// TODO: replace llvmBuilder->getInt32ty with a single variable that calls it
 
 #include "../include/Parser.h"
 
@@ -215,7 +215,9 @@ void Parser::ProgramBody()
     // Always return an integer (0), because according to the way the language is defined, you can have a return
     // statement in the program body but we don't really want to do anything with it.
 
-    llvm::Constant *retVal = llvm::ConstantInt::getIntegerValue(llvmBuilder->getInt32Ty(), llvm::APInt(32, 0, true));
+    llvm::IntegerType *intType = llvmBuilder->getInt32Ty();
+    llvm::APInt retInt = llvm::APInt(32, 0, true);
+    llvm::Constant *retVal = llvm::ConstantInt::getIntegerValue(intType, retInt);
     llvmBuilder->CreateRet(retVal);
 }
 
@@ -467,7 +469,11 @@ void Parser::VariableDeclaration(Symbol &variable)
         if (variable.IsArray())
         {
             variable.SetLLVMArrayAddress(globalVar);
-            llvm::Constant *size = llvm::ConstantInt::getIntegerValue(llvmBuilder->getInt32Ty(), llvm::APInt(32, variable.GetArraySize(), true));
+
+            llvm::IntegerType *intType = llvmBuilder->getInt32Ty();
+            llvm::APInt arrSize = llvm::APInt(32, variable.GetArraySize(), true);
+
+            llvm::Constant *size = llvm::ConstantInt::getIntegerValue(intType, arrSize);
             variable.SetLLVMArraySize(size);
         }
         else
@@ -528,7 +534,8 @@ void Parser::ProcedureDeclaration(Symbol &procedure)
     procedure.SetLLVMFunction(func);
 
     // Don't add if it already exists
-    if (symbolTable.DoesSymbolExist(procedure.GetId()))
+    std::string checkID = procedure.GetId();
+    if (symbolTable.DoesSymbolExist(checkID))
     {
         ReportError("This identifier already exists");
         return;
@@ -630,7 +637,10 @@ void Parser::ProcedureBody()
         // Array
         if (it.second.IsArray())
         {
-            llvm::Value *size = llvm::ConstantInt::getIntegerValue(llvmBuilder->getInt32Ty(), llvm::APInt(32, it.second.GetArraySize(), true));
+            llvm::IntegerType *intType = llvmBuilder->getInt32Ty();
+            llvm::APInt arrSize = llvm::APInt(32, it.second.GetArraySize(), true);
+
+            llvm::Value *size = llvm::ConstantInt::getIntegerValue(intType, arrSize);
             it.second.SetLLVMArraySize(size);
 
             it.second.SetLLVMArrayAddress(llvmBuilder->CreateAlloca(GetLLVMType(it.second), size));
@@ -838,7 +848,11 @@ void Parser::AssignmentStatement()
     // if the array should be unrolled, update value
     if (doUnroll)
     {
-        llvm::Value *one = llvm::ConstantInt::getIntegerValue(llvmBuilder->getInt32Ty(), llvm::APInt(32, 1, true));
+
+        llvm::IntegerType *intType = llvmBuilder->getInt32Ty();
+        llvm::APInt oneAPInt = llvm::APInt(32, 1, true);
+        llvm::Value *one = llvm::ConstantInt::getIntegerValue(intType, oneAPInt);
+
         unrollIdx = llvmBuilder->CreateAdd(unrollIdx, one);
         llvmBuilder->CreateStore(unrollIdx, unrollIdxAddress);
         llvmBuilder->CreateBr(unrollLoopStart);
@@ -1059,8 +1073,11 @@ void Parser::ReturnStatement()
     if (!proc.IsValid())
     {
         ReportWarning("Return statements in this scope are ignored");
-        llvm::Constant *retVal = llvm::ConstantInt::getIntegerValue(llvmBuilder->getInt32Ty(),
-                                                                    llvm::APInt(32, 0, true));
+
+        llvm::IntegerType *intType = llvmBuilder->getInt32Ty();
+        llvm::APInt zeroAPInt = llvm::APInt(32, 0, true);
+        llvm::Constant *retVal = llvm::ConstantInt::getIntegerValue(intType, zeroAPInt);
+
         llvmBuilder->CreateRet(retVal);
         Symbol expr = Symbol();
         Expression(proc, expr);
@@ -1121,7 +1138,10 @@ void Parser::IndexArray(Symbol symbol, Symbol &out)
         }
 
         // Make sure that the index is within the array bound
-        llvm::Value *zero = llvm::ConstantInt::getIntegerValue(llvmBuilder->getInt32Ty(), llvm::APInt(32, 0, true));
+        llvm::IntegerType *intType = llvmBuilder->getInt32Ty();
+        llvm::APInt zeroAPInt = llvm::APInt(32, 0, true);
+        llvm::Value *zero = llvm::ConstantInt::getIntegerValue(intType, zeroAPInt);
+
         llvm::Value *less = llvmBuilder->CreateICmpSLT(idx.GetLLVMValue(), symbol.GetLLVMArraySize());
         llvm::Value *greater = llvmBuilder->CreateICmpSGE(idx.GetLLVMValue(), zero);
         llvm::Value *actualIdx = llvmBuilder->CreateAnd(greater, less);
@@ -1271,11 +1291,13 @@ Symbol Parser::Destination()
             unrollSize = dest.GetArraySize();
 
             // Zero index
-            llvm::Value *zero = llvm::ConstantInt::getIntegerValue(llvmBuilder->getInt32Ty(), llvm::APInt(32, 0, true));
+            llvm::IntegerType *intType = llvmBuilder->getInt32Ty();
+            llvm::APInt zeroAPInt = llvm::APInt(32, 0, true);
+            llvm::Value *zero = llvm::ConstantInt::getIntegerValue(intType, zeroAPInt);
             unrollIdx = zero;
 
             // Store the index
-            unrollIdxAddress = llvmBuilder->CreateAlloca(llvmBuilder->getInt32Ty());
+            unrollIdxAddress = llvmBuilder->CreateAlloca(intType);
             llvmBuilder->CreateStore(unrollIdx, unrollIdxAddress);
 
             // Blocks for unrolling loop
@@ -1286,7 +1308,7 @@ Symbol Parser::Destination()
             // Jump to the loop start and load index
             llvmBuilder->CreateBr(unrollLoopStart);
             llvmBuilder->SetInsertPoint(unrollLoopStart);
-            unrollIdx = llvmBuilder->CreateLoad(llvmBuilder->getInt32Ty(), unrollIdxAddress);
+            unrollIdx = llvmBuilder->CreateLoad(intType, unrollIdxAddress);
 
             // Check if index equals the size, if it does jump to the end
             llvm::Value *cmp = llvmBuilder->CreateICmpEQ(unrollIdx, dest.GetLLVMArraySize());
@@ -1295,7 +1317,7 @@ Symbol Parser::Destination()
             // Set the insert point to the loop body so that the expression of the assignment statement
             // goes in the body
             llvmBuilder->SetInsertPoint(unrollLoopBody);
-            unrollIdx = llvmBuilder->CreateLoad(llvmBuilder->getInt32Ty(), unrollIdxAddress);
+            unrollIdx = llvmBuilder->CreateLoad(intType, unrollIdxAddress);
 
             llvm::Value *addr = nullptr;
             if (dest.IsGlobal())
@@ -1948,13 +1970,16 @@ void Parser::Factor(Symbol expectedType, Symbol &out)
     else if (ValidateToken(T_TRUE))
     {
         sym.SetType(T_BOOL);
-        llvm::Value *val = llvm::ConstantInt::getIntegerValue(GetLLVMType(sym),llvm::APInt(1, 1, true));
+
+        llvm::APInt trueAPInt = llvm::APInt(1, 1, true);
+        llvm::Value *val = llvm::ConstantInt::getIntegerValue(GetLLVMType(sym),trueAPInt);
         sym.SetLLVMValue(val);
     }
     else if (ValidateToken(T_FALSE))
     {
         sym.SetType(T_BOOL);
-        llvm::Value *val = llvm::ConstantInt::getIntegerValue(GetLLVMType(sym),llvm::APInt(1, 0, true));
+        llvm::APInt falseAPInt = llvm::APInt(1, 0, true);
+        llvm::Value *val = llvm::ConstantInt::getIntegerValue(GetLLVMType(sym), falseAPInt);
         sym.SetLLVMValue(val);
     }
     else
@@ -2125,7 +2150,8 @@ void Parser::Number(Symbol &out)
     if (token->type == T_INT_LITERAL)
     {
         sym.SetType(T_INTEGER);
-        val = llvm::ConstantInt::getIntegerValue(GetLLVMType(sym), llvm::APInt(32, token->val.intValue, true));
+        llvm::APInt intValue = llvm::APInt(32, token->val.intValue, true);
+        val = llvm::ConstantInt::getIntegerValue(GetLLVMType(sym), intValue);
     }
     else if (token->type == T_FLOAT_LITERAL)
     {
@@ -2204,7 +2230,9 @@ std::vector<llvm::Value *> Parser::ArgumentList(std::vector<Symbol>::iterator cu
             if (expr.IsGlobal())
             {
                 // Global arrays are weird
-                llvm::Value *zero = llvm::ConstantInt::getIntegerValue(llvmBuilder->getInt32Ty(), llvm::APInt(32, 0, true));
+                llvm::IntegerType *intType = llvmBuilder->getInt32Ty();
+                llvm::APInt zeroAPInt = llvm::APInt(32, 0, true);
+                llvm::Value *zero = llvm::ConstantInt::getIntegerValue(intType, zeroAPInt);
                 llvm::Value *val = llvmBuilder->CreateInBoundsGEP(expr.GetLLVMArrayAddress(), zero);
                 val = llvmBuilder->CreateBitCast(val, GetLLVMType(expr)->getPointerTo());
                 arguments.push_back(val);
@@ -2269,8 +2297,12 @@ llvm::Type *Parser::GetLLVMType(Symbol symbol)
 llvm::Value* Parser::DoStringComp(Symbol term, Symbol relation, token_t *op, llvm::Value* val)
 {
     // create a loop to compare strings
-    llvm::Value *idxAddr = llvmBuilder->CreateAlloca(llvmBuilder->getInt32Ty());
-    llvm::Value *idx = llvm::ConstantInt::getIntegerValue(llvmBuilder->getInt32Ty(), llvm::APInt(32, 0, true));
+    llvm::IntegerType *intType = llvmBuilder->getInt32Ty();
+    llvm::APInt zeroAPInt = llvm::APInt(32, 0, true);
+    llvm::APInt oneAPInt = llvm::APInt(32, 1, true);
+
+    llvm::Value *idxAddr = llvmBuilder->CreateAlloca(intType);
+    llvm::Value *idx = llvm::ConstantInt::getIntegerValue(intType, zeroAPInt);
     llvmBuilder->CreateStore(idx, idxAddr);
 
     llvm::BasicBlock *strCmpStart = llvm::BasicBlock::Create(llvmContext, "strCmpStart", llvmCurrProc);
@@ -2280,8 +2312,8 @@ llvm::Value* Parser::DoStringComp(Symbol term, Symbol relation, token_t *op, llv
     llvmBuilder->CreateBr(strCmpStart);
     llvmBuilder->SetInsertPoint(strCmpStart);
 
-    llvm::Value *one = llvm::ConstantInt::getIntegerValue(llvmBuilder->getInt32Ty(), llvm::APInt(32, 1, true));
-    idx = llvmBuilder->CreateLoad(llvmBuilder->getInt32Ty(), idxAddr);
+    llvm::Value *one = llvm::ConstantInt::getIntegerValue(intType, oneAPInt);
+    idx = llvmBuilder->CreateLoad(intType, idxAddr);
     idx = llvmBuilder->CreateBinOp(llvm::Instruction::Add, idx, one);
     llvmBuilder->CreateStore(idx, idxAddr);
 
