@@ -110,6 +110,7 @@ private:
     std::vector<llvm::Value *> ArgumentList(std::vector<Symbol> &arguments);
 
     llvm::Type* GetLLVMType(Symbol symbol);
+    llvm::Value* CreateConstantInt(int numBits, int intVal, llvm::Type *type);
 
 
 };

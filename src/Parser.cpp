@@ -208,9 +208,7 @@ void Parser::ProgramBody()
 
     // Always return an integer (0), because according to the way the language is defined, you can have a return
     // statement in the program body but we don't really want to do anything with it.
-    llvm::APInt retInt = llvm::APInt(32, 0, true);
-    llvm::Constant *retVal = llvm::ConstantInt::getIntegerValue(intType, retInt);
-    llvmBuilder->CreateRet(retVal);
+    llvmBuilder->CreateRet(CreateConstantInt(32, 0, intType));
 }
 
 // This function handles checking token type matches the expected type
@@ -457,9 +455,7 @@ void Parser::VariableDeclaration(Symbol &variable)
         {
             variable.SetArrayAddress(globalVar);
             llvm::IntegerType *intType = llvmBuilder->getInt32Ty();
-            llvm::APInt arrSize = llvm::APInt(32, variable.GetArraySize(), true);
-            llvm::Constant *size = llvm::ConstantInt::getIntegerValue(intType, arrSize);
-            variable.SetLLVMArraySize(size);
+            variable.SetLLVMArraySize(CreateConstantInt(32, variable.GetArraySize(), intType));
         }
         else
         {
@@ -646,9 +642,7 @@ std::vector<llvm::Value *> Parser::ArgumentList(std::vector<Symbol> &arguments_)
             if (expr.IsGlobal())
             {
                 llvm::IntegerType *intType = llvmBuilder->getInt32Ty();
-                llvm::APInt zeroAPInt = llvm::APInt(32, 0, true);
-                llvm::Value *zero = llvm::ConstantInt::getIntegerValue(intType, zeroAPInt);
-                llvm::Value *val = llvmBuilder->CreateInBoundsGEP(expr.GetArrayAddress(), zero);
+                llvm::Value *val = llvmBuilder->CreateInBoundsGEP(expr.GetArrayAddress(), CreateConstantInt(32, 0, intType));
                 val = llvmBuilder->CreateBitCast(val, GetLLVMType(expr)->getPointerTo());
                 arguments.push_back(val);
             }
@@ -712,9 +706,7 @@ void Parser::ProcedureBody()
         if (it.second.IsArray())
         {
             llvm::IntegerType *intType = llvmBuilder->getInt32Ty();
-            llvm::APInt arrSize = llvm::APInt(32, it.second.GetArraySize(), true);
-
-            llvm::Value *size = llvm::ConstantInt::getIntegerValue(intType, arrSize);
+            llvm::Value *size = CreateConstantInt(32, it.second.GetArraySize(), intType);
             it.second.SetLLVMArraySize(size);
 
             it.second.SetArrayAddress(llvmBuilder->CreateAlloca(GetLLVMType(it.second), size));
@@ -938,11 +930,7 @@ void Parser::AssignmentStatement()
 
     if (doUnroll)
     {
-        llvm::IntegerType *intType = llvmBuilder->getInt32Ty();
-        llvm::APInt oneAPInt = llvm::APInt(32, 1, true);
-        llvm::Value *one = llvm::ConstantInt::getIntegerValue(intType, oneAPInt);
-
-        unrollIdx = llvmBuilder->CreateAdd(unrollIdx, one);
+        unrollIdx = llvmBuilder->CreateAdd(unrollIdx, CreateConstantInt(32, 1, llvmBuilder->getInt32Ty()));
         llvmBuilder->CreateStore(unrollIdx, unrollIdxAddress);
         llvmBuilder->CreateBr(unrollLoopStart);
         llvmBuilder->SetInsertPoint(unrollLoopEnd);
@@ -977,7 +965,7 @@ void Parser::IfStatement()
     if (expr.GetType() == T_INTEGER)
     {
         ReportWarning("Converting integer to boolean");
-        llvm::Value *val = llvmBuilder->CreateICmpNE(expr.GetLLVMValue(), llvm::ConstantInt::get(llvmBuilder->getInt32Ty(), 0, true));
+        llvm::Value *val = llvmBuilder->CreateICmpNE(expr.GetLLVMValue(), CreateConstantInt(32, 0, llvmBuilder->getInt32Ty()));
         expr.SetLLVMValue(val);
     }
     else if (expr.GetType() != T_BOOL)
@@ -1105,7 +1093,7 @@ void Parser::LoopStatement()
     if (expr.GetType() == T_INTEGER)
     {
         ReportWarning("Converting integer to boolean");
-        llvm::Value *val = llvmBuilder->CreateICmpNE(expr.GetLLVMValue(), llvm::ConstantInt::get(llvmBuilder->getInt32Ty(), 0, true));
+        llvm::Value *val = llvmBuilder->CreateICmpNE(expr.GetLLVMValue(), CreateConstantInt(32, 0, llvmBuilder->getInt32Ty()));
         expr.SetLLVMValue(val);
     }
     else if (expr.GetType() != T_BOOL)
@@ -1165,9 +1153,8 @@ void Parser::ReturnStatement()
 
         llvm::IntegerType *intType = llvmBuilder->getInt32Ty();
         llvm::APInt zeroAPInt = llvm::APInt(32, 0, true);
-        llvm::Constant *retVal = llvm::ConstantInt::getIntegerValue(intType, zeroAPInt);
 
-        llvmBuilder->CreateRet(retVal);
+        llvmBuilder->CreateRet(CreateConstantInt(32, 0, intType));
         Symbol expr = Symbol();
         Expression(proc, expr);
         return;
@@ -1222,12 +1209,11 @@ void Parser::IndexArray(Symbol &symbol)
 
         // Make sure that the index is within the array bound
         llvm::IntegerType *intType = llvmBuilder->getInt32Ty();
-        llvm::APInt zeroAPInt = llvm::APInt(32, 0, true);
         llvm::Value *address = nullptr;
 
         // Create check for array bounds
         llvm::Value *lowerBound = llvmBuilder->CreateICmpSLT(idx.GetLLVMValue(), symbol.GetLLVMArraySize());
-        llvm::Value *upperBound = llvmBuilder->CreateICmpSGE(idx.GetLLVMValue(), llvm::ConstantInt::getIntegerValue(intType, zeroAPInt));
+        llvm::Value *upperBound = llvmBuilder->CreateICmpSGE(idx.GetLLVMValue(), CreateConstantInt(32, 0, intType));
         llvm::Value *checkVal = llvmBuilder->CreateAnd(upperBound, lowerBound);
 
         llvm::BasicBlock *oob = llvm::BasicBlock::Create(llvmContext, "oob", llvmCurrProc);
@@ -1248,7 +1234,7 @@ void Parser::IndexArray(Symbol &symbol)
 
         if (symbol.IsGlobal())
         {
-            address = llvmBuilder->CreateInBoundsGEP(symbol.GetArrayAddress(), {llvm::ConstantInt::getIntegerValue(intType, zeroAPInt), idx.GetLLVMValue()});
+            address = llvmBuilder->CreateInBoundsGEP(symbol.GetArrayAddress(), {CreateConstantInt(32, 0, intType), idx.GetLLVMValue()});
         }
         else
         {
@@ -1283,7 +1269,7 @@ void Parser::ValidateAssignment(Symbol lhs, Symbol &rhs)
         isDiff = false;
         rhs.SetType(T_BOOL);
         ReportWarning("Converting int to bool");
-        llvm::Value *val = llvmBuilder->CreateICmpNE(rhs.GetLLVMValue(), llvm::ConstantInt::get(intType, 0, true));
+        llvm::Value *val = llvmBuilder->CreateICmpNE(rhs.GetLLVMValue(), CreateConstantInt(32, 0, intType));
         rhs.SetLLVMValue(val);
     }
 
@@ -1370,8 +1356,7 @@ Symbol Parser::Destination()
 
             // Zero index
             llvm::IntegerType *intType = llvmBuilder->getInt32Ty();
-            llvm::APInt zeroAPInt = llvm::APInt(32, 0, true);
-            llvm::Value *zero = llvm::ConstantInt::getIntegerValue(intType, zeroAPInt);
+            llvm::Value *zero = CreateConstantInt(32, 0, intType);
             unrollIdx = zero;
 
             // Store the index
@@ -1845,7 +1830,7 @@ void Parser::ValidateRelation(Symbol expectedType, Symbol term, Symbol relation_
             //
             // ALso i realize i could just move where the add occurs... but this works for now
             llvm::Value *idxAddr = llvmBuilder->CreateAlloca(intType);
-            llvm::Value *idx = llvm::ConstantInt::getIntegerValue(intType, llvm::APInt(32, -1, true));
+            llvm::Value *idx = CreateConstantInt(32, -1, intType);
 
             llvmBuilder->CreateStore(idx, idxAddr);
 
@@ -1857,7 +1842,7 @@ void Parser::ValidateRelation(Symbol expectedType, Symbol term, Symbol relation_
             llvmBuilder->SetInsertPoint(strCmpStart);
 
             idx = llvmBuilder->CreateLoad(intType, idxAddr);
-            idx = llvmBuilder->CreateBinOp(llvm::Instruction::Add, idx, llvm::ConstantInt::getIntegerValue(intType, oneAPInt));
+            idx = llvmBuilder->CreateBinOp(llvm::Instruction::Add, idx, CreateConstantInt(32, 1, intType));
             llvmBuilder->CreateStore(idx, idxAddr);
 
             // ******* This block works *******
@@ -1876,7 +1861,7 @@ void Parser::ValidateRelation(Symbol expectedType, Symbol term, Symbol relation_
             // ******* This block works *******
 
             // escCh = '\0'
-            llvm::Value *escCh = llvm::ConstantInt::getIntegerValue(int8Ty, llvm::APInt(8, 0, true));
+            llvm::Value *escCh = CreateConstantInt(8, 0, int8Ty);
             llvm::Value *notDone = llvmBuilder->CreateICmpNE(lhsCharacter, escCh);
 
             // Prev char's match and prev lhsChar was not esc char '\0', then continue
@@ -2098,17 +2083,12 @@ void Parser::Factor(Symbol expectedType, Symbol &out)
     else if (ValidateToken(T_TRUE))
     {
         sym.SetType(T_BOOL);
-
-        llvm::APInt trueAPInt = llvm::APInt(1, 1, true);
-        llvm::Value *val = llvm::ConstantInt::getIntegerValue(GetLLVMType(sym),trueAPInt);
-        sym.SetLLVMValue(val);
+        sym.SetLLVMValue(CreateConstantInt(1, 1, GetLLVMType(sym)));
     }
     else if (ValidateToken(T_FALSE))
     {
         sym.SetType(T_BOOL);
-        llvm::APInt falseAPInt = llvm::APInt(1, 0, true);
-        llvm::Value *val = llvm::ConstantInt::getIntegerValue(GetLLVMType(sym), falseAPInt);
-        sym.SetLLVMValue(val);
+        sym.SetLLVMValue(CreateConstantInt(1, 0, GetLLVMType(sym)));
     }
     else
     {
@@ -2243,9 +2223,7 @@ void Parser::Identifiers(Symbol &out)
                 if (sym.IsGlobal())
                 {
                     llvm::IntegerType *intType = llvmBuilder->getInt32Ty();
-                    llvm::APInt zeroAPInt = llvm::APInt(32, 0, true);
-                    llvm::Value *zero = llvm::ConstantInt::getIntegerValue(intType, zeroAPInt);
-                    addr = llvmBuilder->CreateInBoundsGEP(sym.GetArrayAddress(), {zero, unrollIdx});
+                    addr = llvmBuilder->CreateInBoundsGEP(sym.GetArrayAddress(), {CreateConstantInt(32, 0, intType), unrollIdx});
                 }
                 else
                 {
@@ -2291,8 +2269,7 @@ void Parser::Number(Symbol &out)
     if (token->type == T_INT_LITERAL)
     {
         sym.SetType(T_INTEGER);
-        llvm::APInt intValue = llvm::APInt(32, token->val.intValue, true);
-        val = llvm::ConstantInt::getIntegerValue(GetLLVMType(sym), intValue);
+        val = CreateConstantInt(32, token->val.intValue, GetLLVMType(sym));
     }
     else if (token->type == T_FLOAT_LITERAL)
     {
@@ -2342,6 +2319,7 @@ llvm::Type *Parser::GetLLVMType(Symbol symbol)
     }
 }
 
+// Attempt for Resync on error
 bool Parser::DoResync(bool isDec)
 {
 //    std::cout << token->type << std::endl;
@@ -2387,4 +2365,11 @@ bool Parser::DoResync(bool isDec)
     }
 
     return false;
+}
+
+// Helper function for easily creating llvm::ConstantInt, as we need a lot of them
+llvm::Value *Parser::CreateConstantInt(int numBits, int intVal, llvm::Type *type)
+{
+    llvm::APInt intValue = llvm::APInt(numBits, intVal, true);
+    return llvm::ConstantInt::getIntegerValue(type, intValue);
 }
