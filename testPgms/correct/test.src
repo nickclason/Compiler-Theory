@@ -1,22 +1,18 @@
 program test is
 
-    variable lhsStr : string;
-    variable rhsStr : string;
+    variable lhs : integer;
+    variable rhs : string;
 
-    variable tmp : bool;
+    variable f : float;
+    variable i : integer;
+    variable z : bool;
 
 begin
-
-    //lhsStr := "Apple";
-    //rhsStr := "Apple";
-
-    lhsStr := getString();
-    rhsStr := "APplE";
-
-    if (lhsStr == rhsStr) then
-        tmp := putInteger(1);
-    else
-        tmp := putInteger(0);
-    end if;
+    z := true | "string";
+    f := 1.5;
+    rhs := "f";
+    f := "STASDAS"
+    i := 1;
+    f := 1;
 
 end program.

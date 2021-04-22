@@ -1,7 +1,7 @@
 program test is
-    variable a : integer[3];
-    variable b : integer[3];
-    variable c : integer[3];
+    variable a : integer[12];
+    variable b : integer[12];
+    variable c : integer[12];
 
     variable i : integer;
     variable tmp : bool;
@@ -22,7 +22,7 @@ begin
 
     a := b * c + c; // [8, 15, 24]
 
-    for (i := 0; i < 3)
+    for (i := 0; i < 12)
         tmp := putInteger(a[i]);
         i := i+1;
     end for;

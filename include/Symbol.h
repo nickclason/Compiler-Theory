@@ -19,8 +19,6 @@ public:
     Symbol();
     ~Symbol();
 
-    void PrintDebugInfo();
-
     const std::string &GetId() const;
     void SetId(const std::string &id);
 
@@ -51,14 +49,14 @@ public:
     std::vector<Symbol> &GetParameters();
     void SetParameters(const std::vector<Symbol> &parameters);
 
-    llvm::Value *GetLLVMAddress() const;
-    void SetLLVMAddress(llvm::Value *llvmAddress);
+    llvm::Value *GetAddress() const;
+    void SetAddress(llvm::Value *address);
 
     llvm::Value *GetLLVMValue() const;
     void SetLLVMValue(llvm::Value *llvmValue);
 
-    llvm::Value *GetLLVMArrayAddress() const;
-    void SetLLVMArrayAddress(llvm::Value *llvmArrayAddress);
+    llvm::Value *GetArrayAddress() const;
+    void SetArrayAddress(llvm::Value *arrayAddress);
 
     llvm::Value *GetLLVMArraySize() const;
     void SetLLVMArraySize(llvm::Value *llvmArraySize);
@@ -85,9 +83,9 @@ private:
     std::vector<Symbol> parameters;
 
     // LLVM
-    llvm::Value *llvmAddress;
+    llvm::Value *address;
     llvm::Value *llvmValue;
-    llvm::Value *llvmArrayAddress;
+    llvm::Value *arrayAddress;
     llvm::Value *llvmArraySize;
     llvm::Function *llvmFunction;
 };
