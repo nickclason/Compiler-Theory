@@ -29,6 +29,8 @@ private:
 
     bool errorFlag;
     bool doUnroll;
+    bool sucessfulResync;
+
     llvm::Module *llvmModule;
     llvm::IRBuilder<> *llvmBuilder;
     llvm::LLVMContext llvmContext;
@@ -52,7 +54,7 @@ private:
 
     void ReportWarning(std::string msg);
 
-    //bool Resync(int tokens[], int length);
+    bool DoResync(bool isDec);
 
     // Parsing
     void Program();

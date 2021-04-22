@@ -25,6 +25,7 @@ Parser::Parser(Scanner scanner_, SymbolTable symbolTable_, token_t *token_)
 
     errorFlag = false;
     doUnroll = false;
+    sucessfulResync = false;
 
     procedureCount = 0;
     errorCount = 0;
@@ -68,7 +69,7 @@ Parser::Parser(Scanner scanner_, SymbolTable symbolTable_, token_t *token_)
         std::cout << warningCount << " warnings" << std::endl;
     }
 
-    if (!errorFlag && errorCount == 0)
+    if ((!errorFlag && errorCount == 0) || sucessfulResync)
     {
         // Compile
         std::string outFile = "output/IR.ll";
@@ -299,8 +300,6 @@ void Parser::ReportIncompatibleTypeError(std::string op, std::string type1, std:
 // Used for reporting warnings (parse/compile can still continue if there are warnings)
 void Parser::ReportWarning(std::string msg)
 {
-    if (errorFlag) return;
-
     printf("\nLine: %d Col: %d\n\t", token->line, token->col);
     std::cout << "Warning: " << msg << std::endl;
     warningCount++;
@@ -334,7 +333,16 @@ void Parser::Declarations()
 
         if (errorFlag)
         {
-            // TODO: resync i don't get the point of this
+            // TODO: resync i don't get the point of this if there is an error, then there is likely
+            //       to be further errors down the line, so it seems kind of pointless to continue. Especially
+            //       consider that we are basically just ignoring a valid error
+//            std::cout << token->type << std::endl;
+            if (DoResync(true))
+            {
+                Declarations();
+                return;
+            }
+
             return;
         }
         else
@@ -851,7 +859,13 @@ void Parser::Statements(bool singleTerminator)
 
         if (errorFlag)
         {
-            // TODO: resync i don't get the point of this
+            // TODO: RE: resync i don't get the point of this
+            if (DoResync(false))
+            {
+                Statements(singleTerminator);
+                return;
+            }
+
             return;
         }
         else
@@ -2326,4 +2340,50 @@ llvm::Type *Parser::GetLLVMType(Symbol symbol)
             ReportError("Not a valid type");
             return nullptr;
     }
+}
+
+bool Parser::DoResync(bool isDec)
+{
+//    std::cout << token->type << std::endl;
+    ReportWarning("Attempting to resync...");
+    std::vector<int> resyncTokens;
+    if (isDec)
+    {
+        resyncTokens.push_back(T_BEGIN);
+    }
+    else
+    {
+        resyncTokens.push_back(T_END);
+    }
+
+    resyncTokens.push_back(T_SEMICOLON);
+    resyncTokens.push_back(T_PERIOD);
+
+    token_t *tmpToken = scanner.PeekToken();
+    while (errorFlag)
+    {
+        for (int t : resyncTokens)
+        {
+           if ((tmpToken->type == T_BEGIN && isDec) || (tmpToken->type == T_END && !isDec))
+           {
+               errorFlag = false;
+               break;
+           }
+
+           if (tmpToken->type == t)
+           {
+               token = scanner.GetToken();
+               errorFlag = false;
+               sucessfulResync = true;
+               ReportWarning("Resync was successful");
+               return true;
+           }
+
+        }
+        // Keep scanning... again this just seems kind of wrong to do.
+        token = scanner.GetToken();
+        tmpToken = scanner.PeekToken();
+    }
+
+    return false;
 }

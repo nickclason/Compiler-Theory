@@ -1,18 +1,10 @@
 program test is
 
-    variable lhs : integer;
-    variable rhs : string;
-
-    variable f : float;
-    variable i : integer;
-    variable z : bool;
-
+    variable x : integer
+    variable y : integer;
+    variable tmp : bool;
 begin
-    z := true | "string";
-    f := 1.5;
-    rhs := "f";
-    f := "STASDAS"
-    i := 1;
-    f := 1;
 
+    y := 1
+    tmp := putInteger(y);
 end program.
