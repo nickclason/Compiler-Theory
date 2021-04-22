@@ -840,11 +840,10 @@ void Parser::AssignmentStatement()
     // if the array should be unrolled, update value
     if (doUnroll)
     {
-
         llvm::IntegerType *intType = llvmBuilder->getInt32Ty();
         llvm::APInt oneAPInt = llvm::APInt(32, 1, true);
         llvm::Value *one = llvm::ConstantInt::getIntegerValue(intType, oneAPInt);
-        
+
         unrollIdx = llvmBuilder->CreateBinOp(llvm::Instruction::Add, unrollIdx, one);
         llvmBuilder->CreateStore(unrollIdx, unrollIdxAddress);
         llvmBuilder->CreateBr(unrollLoopStart);

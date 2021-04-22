@@ -63,7 +63,6 @@ int main(int argc, char* argv[])
     }
 
     std::string fileName = argv[1];
-//    std::string fileName = "/Users/nick/Documents/Compiler-Theory/testPgms/correct/globalArray.src";
     Scanner scanner;
     SymbolTable symbolTable;
 
