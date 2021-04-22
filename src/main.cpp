@@ -54,15 +54,11 @@ void PeekTest(std::string fileName)
     }
 }
 
-int main(int argc, char* argv[])
+int main()
 {
-    if (argc < 2)
-    {
-        std::cout << "No file found" << std::endl;
-        return 0;
-    }
-
-    std::string fileName = argv[1];
+    std::cout << "Enter file name: ";
+    std::string fileName;
+    std::cin >> fileName;
     Scanner scanner;
     SymbolTable symbolTable;
 
