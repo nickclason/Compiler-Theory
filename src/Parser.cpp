@@ -2345,6 +2345,7 @@ llvm::Type *Parser::GetLLVMType(Symbol symbol)
 bool Parser::DoResync(bool isDec)
 {
 //    std::cout << token->type << std::endl;
+    sucessfulResync = false;
     ReportWarning("Attempting to resync...");
     std::vector<int> resyncTokens;
     if (isDec)

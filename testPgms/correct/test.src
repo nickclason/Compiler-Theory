@@ -2,9 +2,9 @@ program test is
 
     variable x : integer
     variable y : integer;
-    variable tmp : bool;
+    variable tmp : bool
 begin
 
-    y := 1
+    y := 1;
     tmp := putInteger(y);
 end program.
