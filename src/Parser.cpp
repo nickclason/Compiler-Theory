@@ -2,9 +2,6 @@
 // Created by Nick Clason on 2/1/21.
 //
 
-// TODO: Global arrays don't work properly when operating on entire array.
-// TODO: Resync ?
-
 
 #include "../include/Parser.h"
 
@@ -78,11 +75,6 @@ Parser::Parser(Scanner scanner_, SymbolTable symbolTable_, token_t *token_)
         std::error_code error_code;
         llvm::raw_fd_ostream out(outFile, error_code, llvm::sys::fs::F_None);
         llvmModule->print(out, nullptr);
-
-        // TODO: no idea what is causing verification to fail, but i have not encountered any issues in
-        //       generating IR/compiling/linking... yet
-        // bool isVerified = llvm::verifyModule(*llvmModule, &llvm::errs());
-        // if (!isVerified) { llvmModule->print(llvm::errs(), nullptr); return; }
 
         auto TargetTriple = llvm::sys::getDefaultTargetTriple();
 
@@ -852,8 +844,8 @@ void Parser::AssignmentStatement()
         llvm::IntegerType *intType = llvmBuilder->getInt32Ty();
         llvm::APInt oneAPInt = llvm::APInt(32, 1, true);
         llvm::Value *one = llvm::ConstantInt::getIntegerValue(intType, oneAPInt);
-
-        unrollIdx = llvmBuilder->CreateAdd(unrollIdx, one);
+        
+        unrollIdx = llvmBuilder->CreateBinOp(llvm::Instruction::Add, unrollIdx, one);
         llvmBuilder->CreateStore(unrollIdx, unrollIdxAddress);
         llvmBuilder->CreateBr(unrollLoopStart);
         llvmBuilder->SetInsertPoint(unrollLoopEnd);
@@ -2165,9 +2157,25 @@ void Parser::ProcedureCallOrName(Symbol &out)
                     return;
                 }
 
-                llvm::Value *addr = llvmBuilder->CreateGEP(sym.GetLLVMArrayAddress(), unrollIdx);
-                sym.SetLLVMAddress(addr);
+                // Can't believe this was the problem after like a month of looking into this...
+                // I was calling GEP on both global and local arrays, when in reality you need to
+                // call CreateInBoundsGEP for globals. This immediately fixed the issues I was
+                // encountering.
+                llvm::Value *addr = nullptr;
+                if (sym.IsGlobal())
+                {
+                    llvm::IntegerType *intType = llvmBuilder->getInt32Ty();
+                    llvm::APInt zeroAPInt = llvm::APInt(32, 0, true);
+                    llvm::Value *zero = llvm::ConstantInt::getIntegerValue(intType, zeroAPInt);
+                    llvm::Value *vals[] = {zero, unrollIdx};
+                    addr = llvmBuilder->CreateInBoundsGEP(sym.GetLLVMArrayAddress(), vals);
+                }
+                else
+                {
+                    addr = llvmBuilder->CreateGEP(sym.GetLLVMArrayAddress(), unrollIdx);
+                }
 
+                sym.SetLLVMAddress(addr);
             }
         }
         else

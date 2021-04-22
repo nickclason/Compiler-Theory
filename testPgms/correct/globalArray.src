@@ -1,9 +1,30 @@
 program test is
-    variable arr : integer[3];
-    variable str : string;
+    variable a : integer[3];
+    variable b : integer[3];
+    variable c : integer[3];
+
+    variable i : integer;
+    variable tmp : bool;
 
 begin
 
-    str := getString();
+    // arr[0] := 1;
+    // arr[1] := 2;
+    // arr[2] := 3;
+
+    b[0] := 1;
+    b[1] := 2;
+    b[2] := 3;
+
+    c[0] := 4;
+    c[1] := 5;
+    c[2] := 6;
+
+    a := b * c + c; // [8, 15, 24]
+
+    for (i := 0; i < 3)
+        tmp := putInteger(a[i]);
+        i := i+1;
+    end for;
 
 end program .

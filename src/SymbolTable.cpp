@@ -70,7 +70,7 @@ bool SymbolTable::DoesSymbolExist(std::string id)
     {
         return true;
     }
-    else if (scopeCount != 0) // TODO: this is concerning... lets me redefine get/put methods
+    else if (scopeCount != 0)
     {
         return false;
     }
