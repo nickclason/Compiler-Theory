@@ -65,11 +65,11 @@ char* GETSTRING()
 
 float SQRT(int num)
 {
-    return sqrt((double)num);
+    return sqrt((float)num);
 }
 
 void OOB_ERROR()
 {
-    printf("Out-of-bounds error\n");
-    exit(1);
+    printf("Array Out-of-bounds error\n");
+    exit(0);
 }

@@ -140,14 +140,17 @@ void Parser::Program()
 // <program_header>
 void Parser::ProgramHeader()
 {
+    // "program" keyword not found
     if (!ValidateToken(T_PROGRAM))
     {
         ReportMissingTokenError("PROGRAM");
         return;
     }
 
+    // name of the program
     std::string id = Identifier();
 
+    // "is" keyword not found
     if (!ValidateToken(T_IS))
     {
         ReportMissingTokenError("IS");
@@ -158,6 +161,7 @@ void Parser::ProgramHeader()
     llvmModule = new llvm::Module(id, llvmContext);
     llvmBuilder = new llvm::IRBuilder<>(llvmContext);
 
+    // Add built in functions to the symbol table
     symbolTable.AddIOFunctions(llvmModule, llvmBuilder);
 }
 
@@ -180,15 +184,13 @@ void Parser::ProgramBody()
     llvm::FunctionCallee mainCallee = llvmModule->getOrInsertFunction("main", type);
     auto *main = llvm::dyn_cast<llvm::Constant>(mainCallee.getCallee());
     llvmCurrProc = llvm::cast<llvm::Function>(main);
-    llvmCurrProc->setCallingConv(llvm::CallingConv::C);
 
     // First block is named entry, following llvm kaleidoscope tutorial
     llvm::BasicBlock *entry = llvm::BasicBlock::Create(llvmContext, "entry", llvmCurrProc);
     llvmBuilder->SetInsertPoint(entry);
 
     // Get all statements
-    int terminators[] = { T_END };
-    Statements(terminators, 1);
+    Statements(true);
 
     // Don't call ValidateToken(), because Statements() has already gotten the next token
     if (token->type != T_END)
@@ -205,7 +207,6 @@ void Parser::ProgramBody()
 
     // Always return an integer (0), because according to the way the language is defined, you can have a return
     // statement in the program body but we don't really want to do anything with it.
-
     llvm::APInt retInt = llvm::APInt(32, 0, true);
     llvm::Constant *retVal = llvm::ConstantInt::getIntegerValue(intType, retInt);
     llvmBuilder->CreateRet(retVal);
@@ -283,27 +284,14 @@ void Parser::ReportMissingTokenError(std::string expected)
     errorCount++;
 }
 
-// Used for reporting an error where the expected type differs from the actual type.
-void Parser::ReportTypeMismatchError(std::string expected, std::string actual)
-{
-    if (errorFlag) return;
-
-    printf("\nLine: %d Col: %d\n", token->line, token->col);
-    std::cout << "Expected: " << expected << std::endl;
-    std::cout << "Actual: " << actual << std::endl;
-    errorFlag = true;
-    errorCount++;
-}
-
 // Used for reporting an error when two types are incompatible
 void Parser::ReportIncompatibleTypeError(std::string op, std::string type1, std::string type2)
 {
     if (errorFlag) return;
 
     printf("\nLine: %d Col: %d\n\t", token->line, token->col);
-    std::cout << "Incompatible types for " << op << "\n\n\t\t";
-    std::cout << "Type 1: " << type1 << "\n\n\t\t";
-    std::cout << "Type 2: " << type2 << std::endl;
+    std::cout << "The following types are not compatible for " << op << " operations\n\n\t\t";
+    std::cout << type1 << " and " << type2 << std :: endl;
     errorFlag = true;
     errorCount++;
 }
@@ -321,13 +309,13 @@ void Parser::ReportWarning(std::string msg)
 // <identifier>
 std::string Parser::Identifier()
 {
-    if (!ValidateToken(T_IDENTIFIER))
+    if (ValidateToken(T_IDENTIFIER))
     {
-        ReportError("Identifier expected");
-        return std::string();
+        return token->val.stringValue;
     }
 
-    return token->val.stringValue;
+    ReportError("Identifier expected");
+    return std::string();
 }
 
 // Get all <declaration> and stop when the terminating token(s) are reached
@@ -438,7 +426,7 @@ void Parser::VariableDeclaration(Symbol &variable)
 
     if (variable.IsGlobal())
     {
-        llvm::Type *globalTy = nullptr;
+        llvm::Type *globalTy;
 
         // Global array
         if (variable.IsArray())
@@ -450,9 +438,8 @@ void Parser::VariableDeclaration(Symbol &variable)
             globalTy = GetLLVMType(variable);
         }
 
-
-
-        llvm::GlobalVariable *globalVar = new llvm::GlobalVariable(*llvmModule, globalTy, false,
+        // Create the global variable and initialize it
+        auto *globalVar = new llvm::GlobalVariable(*llvmModule, globalTy, false,
                                                                    llvm::GlobalValue::CommonLinkage,
                                                                    llvm::Constant::getNullValue(globalTy), variable.GetId());
         variable.SetIsInitialized(true);
@@ -460,17 +447,15 @@ void Parser::VariableDeclaration(Symbol &variable)
         // Array
         if (variable.IsArray())
         {
-            variable.SetLLVMArrayAddress(globalVar);
-
+            variable.SetArrayAddress(globalVar);
             llvm::IntegerType *intType = llvmBuilder->getInt32Ty();
             llvm::APInt arrSize = llvm::APInt(32, variable.GetArraySize(), true);
-
             llvm::Constant *size = llvm::ConstantInt::getIntegerValue(intType, arrSize);
             variable.SetLLVMArraySize(size);
         }
         else
         {
-            variable.SetLLVMAddress(globalVar);
+            variable.SetAddress(globalVar);
         }
     }
 
@@ -517,12 +502,11 @@ void Parser::ProcedureDeclaration(Symbol &procedure)
     }
 
     // Create the function for llvm
-    llvm::FunctionType *procType = llvm::FunctionType::get(GetLLVMType(procedure), parameters, false);
+    auto *procType = llvm::FunctionType::get(GetLLVMType(procedure), parameters, false);
     auto *proc = llvm::dyn_cast<llvm::Constant>(llvmModule->getOrInsertFunction("function" + std::to_string(procedureCount), procType).getCallee());
     procedureCount++;
 
     auto *func = llvm::cast<llvm::Function>(proc);
-    func->setCallingConv(llvm::CallingConv::C);
     procedure.SetLLVMFunction(func);
 
     // Don't add if it already exists
@@ -604,6 +588,97 @@ void Parser::Parameter(Symbol &procedure)
     procedure.GetParameters().push_back(param);
 }
 
+// <argument_list>
+std::vector<llvm::Value *> Parser::ArgumentList(std::vector<Symbol> &arguments_)
+{
+    bool continue_ = true;
+    std::vector<llvm::Value *> arguments;
+    std::vector<Symbol>::iterator curr = arguments_.begin();
+    std::vector<Symbol>::iterator end = arguments_.end();
+
+    while (continue_)
+    {
+        continue_ = false;
+
+        if (curr == end)
+        {
+            // No more args
+            ReportError("Too many arguments");
+            return arguments;
+        }
+
+        // Make sure the type matches what is expected
+        Symbol expr = Symbol();
+        Expression(*curr, expr);
+        ValidateAssignment(*curr, expr);
+
+        if (curr->IsArray())
+        {
+            if (curr->GetArraySize() != expr.GetArraySize() || expr.IsArrayIndexed())
+            {
+                ReportError("Array expected as argument");
+                return arguments;
+            }
+        }
+        else if (expr.IsArray() && !expr.IsArrayIndexed())
+        {
+            ReportError("Invalid argument: Cannot pass un-indexed array");
+            return arguments;
+        }
+
+        if (!expr.IsValid())
+        {
+            return arguments;
+        }
+
+        // add to arg vector
+        bool addArrayArg = (expr.IsArray() && !expr.IsArrayIndexed());
+        if (addArrayArg)
+        {
+            if (expr.IsGlobal())
+            {
+                llvm::IntegerType *intType = llvmBuilder->getInt32Ty();
+                llvm::APInt zeroAPInt = llvm::APInt(32, 0, true);
+                llvm::Value *zero = llvm::ConstantInt::getIntegerValue(intType, zeroAPInt);
+                llvm::Value *val = llvmBuilder->CreateInBoundsGEP(expr.GetArrayAddress(), zero);
+                val = llvmBuilder->CreateBitCast(val, GetLLVMType(expr)->getPointerTo());
+                arguments.push_back(val);
+            }
+            else
+            {
+                arguments.push_back(expr.GetLLVMValue());
+            }
+        }
+        else
+        {
+            arguments.push_back(expr.GetLLVMValue());
+        }
+
+        // but wait, there's more
+        if (ValidateToken(T_COMMA))
+        {
+            continue_ = true;
+            curr = std::next(curr);
+        }
+        else
+        {
+            if (curr != end)
+            {
+                if (std::next(curr) != end)
+                {
+                    ReportError("Not enough arguments");
+                    return arguments;
+                }
+            }
+
+            continue_ = false;
+        }
+    }
+
+
+    return arguments;
+}
+
 // <procedure_body>
 void Parser::ProcedureBody()
 {
@@ -611,12 +686,11 @@ void Parser::ProcedureBody()
     Declarations();
 
     // Get the scopes procedure and set the current procedure to it
-    Symbol procSymbol = symbolTable.GetScopeProc();
-    llvmCurrProc = procSymbol.GetLLVMFunction();
+    Symbol currProc = symbolTable.GetScopeProc();
 
     // Create entry block
-    llvm::BasicBlock *procEntry = llvm::BasicBlock::Create(llvmContext, "entry", llvmCurrProc);
-    llvmBuilder->SetInsertPoint(procEntry);
+    llvm::BasicBlock *entry = llvm::BasicBlock::Create(llvmContext, "entry", llvmCurrProc = currProc.GetLLVMFunction());
+    llvmBuilder->SetInsertPoint(entry);
 
     // Create all local variables
     std::map<std::string, Symbol>::iterator it;
@@ -635,12 +709,12 @@ void Parser::ProcedureBody()
             llvm::Value *size = llvm::ConstantInt::getIntegerValue(intType, arrSize);
             it.second.SetLLVMArraySize(size);
 
-            it.second.SetLLVMArrayAddress(llvmBuilder->CreateAlloca(GetLLVMType(it.second), size));
+            it.second.SetArrayAddress(llvmBuilder->CreateAlloca(GetLLVMType(it.second), size));
             it.second.SetIsInitialized(true);
         }
         else
         {
-            it.second.SetLLVMAddress(llvmBuilder->CreateAlloca(GetLLVMType(it.second)));
+            it.second.SetAddress(llvmBuilder->CreateAlloca(GetLLVMType(it.second)));
         }
 
         symbolTable.AddSymbol(it.second);
@@ -648,7 +722,7 @@ void Parser::ProcedureBody()
 
     // Create arguments
     llvm::Function::arg_iterator args = llvmCurrProc->arg_begin();
-    for (const Symbol& sym : procSymbol.GetParameters())
+    for (const Symbol& sym : currProc.GetParameters())
     {
         if (args == llvmCurrProc->arg_end())
         {
@@ -657,20 +731,20 @@ void Parser::ProcedureBody()
         }
 
         // Create arg value and update
-        llvm::Value *argVal = &*args++;
-        Symbol newSymbol = symbolTable.FindSymbol(sym.GetId());
-        newSymbol.SetLLVMValue(argVal);
-        newSymbol.SetIsInitialized(true);
+        llvm::Value *argVal = args++;
 
+        Symbol newSymbol = symbolTable.FindSymbol(sym.GetId());
         if (newSymbol.IsArray())
         {
-            newSymbol.SetLLVMArrayAddress(argVal);
+            newSymbol.SetArrayAddress(argVal);
         }
         else
         {
-            llvmBuilder->CreateStore(argVal, newSymbol.GetLLVMAddress());
+            llvmBuilder->CreateStore(argVal, newSymbol.GetAddress());
         }
 
+        newSymbol.SetLLVMValue(argVal);
+        newSymbol.SetIsInitialized(true);
         symbolTable.AddSymbol(newSymbol);
     }
 
@@ -681,8 +755,7 @@ void Parser::ProcedureBody()
     }
 
     // Get all statements
-    int terminators[] = {T_END};
-    Statements(terminators, 1);
+    Statements(true);
 
     if (!ValidateToken(T_PROCEDURE))
     {
@@ -745,13 +818,26 @@ void Parser::Bound(Symbol &symbol)
     symbol.SetArraySize(size);
 }
 
-// Get all <statement> and stop when the terminating token(s) are reached
-void Parser::Statements(int terminators[], int terminatorsSize)
+// Get all <statement>
+void Parser::Statements(bool singleTerminator)
 {
     bool continue_ = true;
-    for (int i = 0; i < terminatorsSize; i++)
+    int numTerms = (singleTerminator ? 1 : 2);
+    std::vector<int> terminators;
+
+    if (singleTerminator)
     {
-        if (ValidateToken(terminators[i]))
+        terminators.push_back(T_END);
+    }
+    else
+    {
+        terminators.push_back(T_ELSE);
+        terminators.push_back(T_END);
+    }
+
+    for (auto i = terminators.begin(); i != terminators.end(); ++i)
+    {
+        if (ValidateToken(*i))
         {
             continue_ = false;
             break;
@@ -778,9 +864,9 @@ void Parser::Statements(int terminators[], int terminatorsSize)
         }
 
         // check if any of the terminating tokens match the next token, if so stop
-        for (int i = 0; i < terminatorsSize; i++)
+        for (auto i = terminators.begin(); i != terminators.end(); ++i)
         {
-            if (ValidateToken(terminators[i]))
+            if (ValidateToken(*i))
             {
                 continue_ = false;
                 break;
@@ -828,30 +914,27 @@ void Parser::AssignmentStatement()
     // Right hand side
     Symbol expr = Symbol();
     Expression(dest, expr);
-    AssignmentTypeCheck(dest, expr, token, expr);
+    ValidateAssignment(dest, expr);
 
     if (!expr.IsValid()) { return; }
 
     // Store expression in the destination
-    llvmBuilder->CreateStore(expr.GetLLVMValue(), dest.GetLLVMAddress());
+    llvmBuilder->CreateStore(expr.GetLLVMValue(), dest.GetAddress());
     dest.SetLLVMValue(expr.GetLLVMValue());
-    symbolTable.AddSymbol(dest);
 
-    // if the array should be unrolled, update value
     if (doUnroll)
     {
         llvm::IntegerType *intType = llvmBuilder->getInt32Ty();
         llvm::APInt oneAPInt = llvm::APInt(32, 1, true);
         llvm::Value *one = llvm::ConstantInt::getIntegerValue(intType, oneAPInt);
 
-        unrollIdx = llvmBuilder->CreateBinOp(llvm::Instruction::Add, unrollIdx, one);
+        unrollIdx = llvmBuilder->CreateAdd(unrollIdx, one);
         llvmBuilder->CreateStore(unrollIdx, unrollIdxAddress);
         llvmBuilder->CreateBr(unrollLoopStart);
         llvmBuilder->SetInsertPoint(unrollLoopEnd);
         doUnroll = false;
     }
 
-    // Update
     dest.SetIsInitialized(true);
     symbolTable.AddSymbol(dest); // Update
 }
@@ -911,23 +994,23 @@ void Parser::IfStatement()
     llvmBuilder->SetInsertPoint(ifBlock);
 
     // if block statements
-    int terminators[] = {T_ELSE, T_END};
-    Statements(terminators, 2);
+    Statements(false);
 
     if (token->type == T_ELSE)
     {
         endBlock = llvm::BasicBlock::Create(llvmContext, "endIf", llvmCurrProc);
-
-        if (llvmBuilder->GetInsertBlock()->getTerminator() == nullptr)
+        if (llvmBuilder->GetInsertBlock()->getTerminator() != nullptr)
+        {
+            llvmBuilder->SetInsertPoint(elseBlock);
+        }
+        else
         {
             llvmBuilder->CreateBr(endBlock);
+            llvmBuilder->SetInsertPoint(elseBlock);
         }
 
-        llvmBuilder->SetInsertPoint(elseBlock);
-
         // else block statements
-        int endElse[] = {T_END};
-        Statements(endElse, 1);
+        Statements(true);
     }
 
     if (token->type != T_END)
@@ -942,25 +1025,27 @@ void Parser::IfStatement()
         return;
     }
 
-    if (endBlock == nullptr)
-    {
-        // go from if to else
-        if (llvmBuilder->GetInsertBlock()->getTerminator() == nullptr)
-        {
-            llvmBuilder->CreateBr(elseBlock);
-        }
 
-        llvmBuilder->SetInsertPoint(elseBlock);
-    }
-    else
+    bool isNullTerm = (llvmBuilder->GetInsertBlock()->getTerminator() == nullptr);
+    if (endBlock != nullptr)
     {
         // go from else to end
-        if (llvmBuilder->GetInsertBlock()->getTerminator() == nullptr)
+        if (isNullTerm)
         {
             llvmBuilder->CreateBr(endBlock);
         }
 
         llvmBuilder->SetInsertPoint(endBlock);
+    }
+    else
+    {
+        // go from if to else
+        if (isNullTerm)
+        {
+            llvmBuilder->CreateBr(elseBlock);
+        }
+
+        llvmBuilder->SetInsertPoint(elseBlock);
     }
 }
 
@@ -1026,8 +1111,7 @@ void Parser::LoopStatement()
     llvmBuilder->SetInsertPoint(loopBody);
 
     // Get all statements
-    int terminators[] = {T_END};
-    Statements(terminators, 1);
+    Statements(true);
 
     if (token->type != T_END)
     {
@@ -1078,7 +1162,7 @@ void Parser::ReturnStatement()
     // Get expression
     Symbol expr = Symbol();
     Expression(proc, expr);
-    AssignmentTypeCheck(proc, expr, token, expr);
+    ValidateAssignment(proc, expr);
     if (!expr.IsValid()) {
         return;
     }
@@ -1088,7 +1172,7 @@ void Parser::ReturnStatement()
 }
 
 // Index the symbol passed in
-void Parser::IndexArray(Symbol symbol, Symbol &out)
+void Parser::IndexArray(Symbol &symbol)
 {
     symbol.SetIsArrayIndexed(true);
     Symbol sym = Symbol();
@@ -1099,14 +1183,12 @@ void Parser::IndexArray(Symbol symbol, Symbol &out)
         sym.SetType(T_INTEGER);
         Symbol idx = Symbol();
         Expression(sym, idx);
-        AssignmentTypeCheck(sym, idx, token, idx);
+        ValidateAssignment(sym, idx);
 
         if (idx.GetType() != T_INTEGER)
         {
             ReportError("Array index must be an integer.");
             symbol.SetIsValid(false);
-
-            out.CopySymbol(symbol);
             return;
         }
 
@@ -1114,8 +1196,6 @@ void Parser::IndexArray(Symbol symbol, Symbol &out)
         {
             ReportError("Indexing not supported for non-arrays");
             symbol.SetIsValid(false);
-
-            out.CopySymbol(symbol);
             return;
         }
 
@@ -1123,69 +1203,60 @@ void Parser::IndexArray(Symbol symbol, Symbol &out)
         {
             ReportMissingTokenError("]");
             symbol.SetIsValid(false);
-
-            out.CopySymbol(symbol);
             return;
         }
 
         // Make sure that the index is within the array bound
         llvm::IntegerType *intType = llvmBuilder->getInt32Ty();
         llvm::APInt zeroAPInt = llvm::APInt(32, 0, true);
-        llvm::Value *zero = llvm::ConstantInt::getIntegerValue(intType, zeroAPInt);
+        llvm::Value *address = nullptr;
 
-        llvm::Value *less = llvmBuilder->CreateICmpSLT(idx.GetLLVMValue(), symbol.GetLLVMArraySize());
-        llvm::Value *greater = llvmBuilder->CreateICmpSGE(idx.GetLLVMValue(), zero);
-        llvm::Value *actualIdx = llvmBuilder->CreateAnd(greater, less);
+        // Create check for array bounds
+        llvm::Value *lowerBound = llvmBuilder->CreateICmpSLT(idx.GetLLVMValue(), symbol.GetLLVMArraySize());
+        llvm::Value *upperBound = llvmBuilder->CreateICmpSGE(idx.GetLLVMValue(), llvm::ConstantInt::getIntegerValue(intType, zeroAPInt));
+        llvm::Value *checkVal = llvmBuilder->CreateAnd(upperBound, lowerBound);
 
-        llvm::BasicBlock *fail = llvm::BasicBlock::Create(llvmContext, "fail", llvmCurrProc);
-        llvm::BasicBlock *succ = llvm::BasicBlock::Create(llvmContext, "success", llvmCurrProc);
+        llvm::BasicBlock *oob = llvm::BasicBlock::Create(llvmContext, "oob", llvmCurrProc);
+        llvm::BasicBlock *validIdx = llvm::BasicBlock::Create(llvmContext, "validIdx", llvmCurrProc);
 
-        // go to fail if index is invalid, otherwise succ
-        llvmBuilder->CreateCondBr(actualIdx, succ, fail);
-        llvmBuilder->SetInsertPoint(fail);
+        llvmBuilder->CreateCondBr(checkVal, validIdx, oob);
+        llvmBuilder->SetInsertPoint(oob);
 
         // for any out of bounds errors
         // this is treated as a runtime exception as the syntax would still be perfectly valid
+        // and theres no way to tell the size at this point
         //  i.e. variable x : integer[2]
         //       x[100] := 1; this syntax is still valid in the eyes of the parser
-        Symbol oobError = symbolTable.FindSymbol("OOB_ERROR");
-        llvmBuilder->CreateCall(oobError.GetLLVMFunction());
+        auto oobError = symbolTable.FindSymbol("OOB_ERROR").GetLLVMFunction(); // safe because i add this myself
+        llvmBuilder->CreateCall(oobError);
+        llvmBuilder->CreateBr(validIdx);
+        llvmBuilder->SetInsertPoint(validIdx);
 
-        llvmBuilder->CreateBr(succ);
-        llvmBuilder->SetInsertPoint(succ);
-
-        llvm::Value *address = nullptr;
         if (symbol.IsGlobal())
         {
-            llvm::Value *vals[] = {zero, idx.GetLLVMValue()};
-            address = llvmBuilder->CreateInBoundsGEP(symbol.GetLLVMArrayAddress(), vals);
+            address = llvmBuilder->CreateInBoundsGEP(symbol.GetArrayAddress(), {llvm::ConstantInt::getIntegerValue(intType, zeroAPInt), idx.GetLLVMValue()});
         }
         else
         {
-            address = llvmBuilder->CreateGEP(symbol.GetLLVMArrayAddress(), idx.GetLLVMValue());
+            address = llvmBuilder->CreateGEP(symbol.GetArrayAddress(), idx.GetLLVMValue());
         }
 
-        symbol.SetLLVMAddress(address);
-
-        out.CopySymbol(symbol);
+        symbol.SetAddress(address);
         return;
     }
 
     ReportMissingTokenError("[");
     sym.SetIsValid(false);
-
-    out.CopySymbol(symbol);
     return;
 }
 
 // This function checks that the destination and expression evaluate to the same type,
 // or interoperable types, and does any type conversions if necessary. Converting from one type to another
 // will yield a warning to user.
-void Parser::AssignmentTypeCheck(Symbol dest, Symbol expr, token_t *token, Symbol &out)
+void Parser::ValidateAssignment(Symbol lhs, Symbol &rhs)
 {
-    if (dest.GetType() == expr.GetType())
+    if (lhs.GetType() == rhs.GetType())
     {
-        out.CopySymbol(expr);
         return;
     }
 
@@ -1193,58 +1264,57 @@ void Parser::AssignmentTypeCheck(Symbol dest, Symbol expr, token_t *token, Symbo
     llvm::IntegerType *intType = llvmBuilder->getInt32Ty();
 
     // int -> bool
-    if (dest.GetType() == T_BOOL && expr.GetType() == T_INTEGER)
+    if (lhs.GetType() == T_BOOL && rhs.GetType() == T_INTEGER)
     {
         isDiff = false;
-        expr.SetType(T_BOOL);
+        rhs.SetType(T_BOOL);
         ReportWarning("Converting int to bool");
-        llvm::Value *val = llvmBuilder->CreateICmpNE(expr.GetLLVMValue(), llvm::ConstantInt::get(intType, 0, true));
-        expr.SetLLVMValue(val);
+        llvm::Value *val = llvmBuilder->CreateICmpNE(rhs.GetLLVMValue(), llvm::ConstantInt::get(intType, 0, true));
+        rhs.SetLLVMValue(val);
     }
 
-    if (dest.GetType() == T_INTEGER)
+    if (lhs.GetType() == T_INTEGER)
     {
         // bool -> int
 
-        if (expr.GetType() == T_BOOL)
+        if (rhs.GetType() == T_BOOL)
         {
-            expr.SetType(T_INTEGER);
+            rhs.SetType(T_INTEGER);
             isDiff = false;
             ReportWarning("Converting bool to int");
-            llvm::Value *val = llvmBuilder->CreateZExtOrTrunc(expr.GetLLVMValue(), intType);
-            expr.SetLLVMValue(val);
+            llvm::Value *val = llvmBuilder->CreateZExtOrTrunc(rhs.GetLLVMValue(), intType);
+            rhs.SetLLVMValue(val);
         }
-        else if (expr.GetType() == T_FLOAT) // float -> int
+        else if (rhs.GetType() == T_FLOAT) // float -> int
         {
-            expr.SetType(T_INTEGER);
+            rhs.SetType(T_INTEGER);
             isDiff = false;
             ReportWarning("Converting float to int");
-            llvm::Value *val = llvmBuilder->CreateFPToSI(expr.GetLLVMValue(), intType);
-            expr.SetLLVMValue(val);
+            llvm::Value *val = llvmBuilder->CreateFPToSI(rhs.GetLLVMValue(), intType);
+            rhs.SetLLVMValue(val);
         }
     }
 
     // int -> float
-    if (dest.GetType() == T_FLOAT && expr.GetType() == T_INTEGER)
+    if (lhs.GetType() == T_FLOAT && rhs.GetType() == T_INTEGER)
     {
         isDiff = false;
         ReportWarning("Converting int to float");
-        expr.SetType(T_FLOAT);
-        llvm::Value *val = llvmBuilder->CreateSIToFP(expr.GetLLVMValue(), llvmBuilder->getFloatTy());
-        expr.SetLLVMValue(val);
+        rhs.SetType(T_FLOAT);
+        llvm::Value *val = llvmBuilder->CreateSIToFP(rhs.GetLLVMValue(), llvmBuilder->getFloatTy());
+        rhs.SetLLVMValue(val);
     }
 
     // If we get here, no suitable conversion was found and the types do not match, nor are they interoperable
     if (isDiff)
     {
-        ReportTypeMismatchError(TypeToString(dest.GetType()), TypeToString(expr.GetType()));
-        expr.SetIsValid(false);
-        out.CopySymbol(expr);
+        std::string errorStr = "Expected: " + TypeToString(lhs.GetType()) + "\n";
+        errorStr += "\tActual: " + TypeToString(rhs.GetType()) + "\n";
+        ReportError(errorStr);
+
+        rhs.SetIsValid(false);
         return;
     }
-
-    // By this point any compatible types should have been converted
-    out.CopySymbol(expr);
 }
 
 // <destination>
@@ -1272,7 +1342,7 @@ Symbol Parser::Destination()
     // Index was supplied, index the array
     if (ValidateToken(T_LBRACKET))
     {
-        IndexArray(dest, dest);
+        IndexArray(dest);
     }
     else // if it is an array with no index, then we unroll the array to operate on the entire thing
     {
@@ -1282,6 +1352,7 @@ Symbol Parser::Destination()
             dest.SetIsArrayIndexed(true);
             doUnroll = true;
             unrollSize = dest.GetArraySize();
+            llvm::Value *addr = nullptr;
 
             // Zero index
             llvm::IntegerType *intType = llvmBuilder->getInt32Ty();
@@ -1312,18 +1383,16 @@ Symbol Parser::Destination()
             llvmBuilder->SetInsertPoint(unrollLoopBody);
             unrollIdx = llvmBuilder->CreateLoad(intType, unrollIdxAddress);
 
-            llvm::Value *addr = nullptr;
             if (dest.IsGlobal())
             {
-                llvm::Value *vals[] = {zero, unrollIdx};
-                addr = llvmBuilder->CreateInBoundsGEP(dest.GetLLVMArrayAddress(), vals);
+                addr = llvmBuilder->CreateInBoundsGEP(dest.GetArrayAddress(), {zero, unrollIdx});
             }
             else
             {
-                addr = llvmBuilder->CreateGEP(dest.GetLLVMArrayAddress(), unrollIdx);
+                addr = llvmBuilder->CreateGEP(dest.GetArrayAddress(), unrollIdx);
             }
 
-            dest.SetLLVMAddress(addr);
+            dest.SetAddress(addr);
 
         }
     }
@@ -1343,7 +1412,7 @@ void Parser::Expression(Symbol expectedType, Symbol &out)
     Symbol expr_ = Symbol();
     Expression_(expectedType, expr_);
 
-    ExpressionTypeCheck(expectedType, arithOp, expr_, op, isNotOp, out);
+    ValidateExpression(expectedType, arithOp, expr_, op, isNotOp, out);
 }
 
 // <expression>
@@ -1357,7 +1426,7 @@ void Parser::Expression_(Symbol expectedType, Symbol &out)
         Symbol expr_ = Symbol();
         Expression_(expectedType, expr_);
 
-        ExpressionTypeCheck(expectedType, arithOp, expr_, op, false, out);
+        ValidateExpression(expectedType, arithOp, expr_, op, false, out);
         return;
     }
 
@@ -1367,7 +1436,7 @@ void Parser::Expression_(Symbol expectedType, Symbol &out)
 }
 
 // Verify expression is valid, types match, do codegen
-void Parser::ExpressionTypeCheck(Symbol expectedType, Symbol arithOp, Symbol expr_, token_t *op, bool isNotOp, Symbol &out)
+void Parser::ValidateExpression(Symbol expectedType, Symbol arithOp, Symbol expr_, token_t *op, bool isNotOp, Symbol &out)
 {
     if (expr_.IsValid())
     {
@@ -1482,7 +1551,7 @@ void Parser::ArithOp(Symbol expectedType, Symbol &out)
     Symbol arithOp_ = Symbol();
     ArithOp_(expectedType, arithOp_);
 
-    ArithOpTypeCheck(expectedType, rel, arithOp_, op, out);
+    ValidateArithOp(expectedType, rel, arithOp_, op, out);
 }
 
 // <arith_op>
@@ -1496,19 +1565,17 @@ void Parser::ArithOp_(Symbol expectedType, Symbol &out)
         Symbol arithOp_ = Symbol();
         ArithOp_(expectedType, arithOp_);
 
-        ArithOpTypeCheck(expectedType, rel, arithOp_, op, out);
+        ValidateArithOp(expectedType, rel, arithOp_, op, out);
         return;
     }
 
     Symbol sym = Symbol();
     sym.SetIsValid(false);
-
     out.CopySymbol(sym);
-    return;
 }
 
 // Verify arithOp is valid, types match, do codegen
-void Parser::ArithOpTypeCheck(Symbol expectedType, Symbol rel, Symbol arithOp_, token_t *op, Symbol &out)
+void Parser::ValidateArithOp(Symbol expectedType, Symbol rel, Symbol arithOp_, token_t *op, Symbol &out)
 {
     if (arithOp_.IsValid())
     {
@@ -1516,25 +1583,29 @@ void Parser::ArithOpTypeCheck(Symbol expectedType, Symbol rel, Symbol arithOp_, 
 
         // check if types are interoperable
         bool isInterop = false;
-        if (rel.GetType() == T_INTEGER)
-        {
-            isInterop = (arithOp_.GetType() == T_INTEGER || arithOp_.GetType() == T_FLOAT);
-            if (isInterop && arithOp_.GetType() == T_FLOAT)
-            {
-                // do type conversion
-                llvm::Value *val = llvmBuilder->CreateSIToFP(rel.GetLLVMValue(), llvmBuilder->getFloatTy());
-                rel.SetLLVMValue(val);
+        int relType = rel.GetType();
 
-            }
-        }
-        else if (rel.GetType() == T_FLOAT)
+        switch (relType)
         {
-            isInterop = (arithOp_.GetType() == T_INTEGER || arithOp_.GetType() == T_FLOAT);
-            if (isInterop && arithOp_.GetType() == T_INTEGER)
-            {
-                llvm::Value *val = llvmBuilder->CreateSIToFP(arithOp_.GetLLVMValue(), llvmBuilder->getFloatTy());
-                arithOp_.SetLLVMValue(val);
-            }
+            case T_INTEGER:
+                isInterop = (arithOp_.GetType() == T_INTEGER || arithOp_.GetType() == T_FLOAT);
+                if (isInterop && arithOp_.GetType() == T_FLOAT)
+                {
+                    // do type conversion
+                    llvm::Value *val = llvmBuilder->CreateSIToFP(rel.GetLLVMValue(), llvmBuilder->getFloatTy());
+                    rel.SetLLVMValue(val);
+                }
+                break;
+            case T_FLOAT:
+                isInterop = (arithOp_.GetType() == T_INTEGER || arithOp_.GetType() == T_FLOAT);
+                if (isInterop && arithOp_.GetType() == T_INTEGER)
+                {
+                    llvm::Value *val = llvmBuilder->CreateSIToFP(arithOp_.GetLLVMValue(), llvmBuilder->getFloatTy());
+                    arithOp_.SetLLVMValue(val);
+                }
+                break;
+            default:
+                break;
         }
 
         if (!isInterop)
@@ -1609,37 +1680,36 @@ void Parser::ArithOpTypeCheck(Symbol expectedType, Symbol rel, Symbol arithOp_, 
 
         sym.SetLLVMValue(val);
 
-        if (expectedType.GetType() == T_FLOAT)
+        int expTy = expectedType.GetType();
+        switch (expTy)
         {
-            // Cast to float
-            sym.SetType(T_FLOAT);
-            if (!isFloatOp)
-            {
-                llvm::Value *val = llvmBuilder->CreateSIToFP(sym.GetLLVMValue(), llvmBuilder->getFloatTy());
-                sym.SetLLVMValue(val);
-            }
-        }
-        else if (expectedType.GetType() == T_INTEGER)
-        {
-            // Cast to int
-            sym.SetType(T_INTEGER);
-            if (isFloatOp)
-            {
-                llvm::Value *val = llvmBuilder->CreateSIToFP(sym.GetLLVMValue(), llvmBuilder->getInt32Ty());
-                sym.SetLLVMValue(val);
-            }
-        }
-        else
-        {
-            // float is preferred
-            if (rel.GetType() == T_FLOAT || arithOp_.GetType() == T_FLOAT)
-            {
+            case T_FLOAT:
+                // Cast to float
                 sym.SetType(T_FLOAT);
-            }
-            else
-            {
+                if (!isFloatOp)
+                {
+                    llvm::Value *val = llvmBuilder->CreateSIToFP(sym.GetLLVMValue(), llvmBuilder->getFloatTy());
+                    sym.SetLLVMValue(val);
+                }
+                break;
+            case T_INTEGER:
                 sym.SetType(T_INTEGER);
-            }
+                if (isFloatOp)
+                {
+                    llvm::Value *val = llvmBuilder->CreateSIToFP(sym.GetLLVMValue(), llvmBuilder->getInt32Ty());
+                    sym.SetLLVMValue(val);
+                }
+                break;
+            default:
+                if (rel.GetType() == T_FLOAT || arithOp_.GetType() == T_FLOAT)
+                {
+                    sym.SetType(T_FLOAT);
+                }
+                else
+                {
+                    sym.SetType(T_INTEGER);
+                }
+                break;
         }
 
         out.CopySymbol(sym);
@@ -1662,7 +1732,7 @@ void Parser::Relation(Symbol expectedType, Symbol &out)
     Symbol relation_ = Symbol();
     Relation_(expectedType, relation_);
 
-    RelationTypeCheck(expectedType, term, relation_, op, out);
+    ValidateRelation(expectedType, term, relation_, op, out);
 }
 
 // <relation>
@@ -1681,19 +1751,17 @@ void Parser::Relation_(Symbol expectedType, Symbol &out)
         Symbol relation_ = Symbol();
         Relation_(expectedType, relation_);
 
-        RelationTypeCheck(expectedType, term, relation_, op, out);
+        ValidateRelation(expectedType, term, relation_, op, out);
         return;
     }
 
     Symbol sym = Symbol();
     sym.SetIsValid(false);
-
     out.CopySymbol(sym);
-    return;
 }
 
 // Verify relation is valid, types match, do codegen
-void Parser::RelationTypeCheck(Symbol expectedType, Symbol term, Symbol relation_, token_t *op, Symbol &out)
+void Parser::ValidateRelation(Symbol expectedType, Symbol term, Symbol relation_, token_t *op, Symbol &out)
 {
     if (relation_.IsValid())
     {
@@ -1751,7 +1819,7 @@ void Parser::RelationTypeCheck(Symbol expectedType, Symbol term, Symbol relation
             return;
         }
 
-        llvm::Value *val ;
+        llvm::Value *val;
         if (term.GetType() == T_STRING)
         {
             llvm::IntegerType *intType = llvmBuilder->getInt32Ty();
@@ -1761,6 +1829,7 @@ void Parser::RelationTypeCheck(Symbol expectedType, Symbol term, Symbol relation
             // to check the first character. This created issues for single character comparisons and the first
             // character of all strings was actually never being checked, leading to incorrect comparisons.
             //
+            // ALso i realize i could just move where the add occurs... but this works for now
             llvm::Value *idxAddr = llvmBuilder->CreateAlloca(intType);
             llvm::Value *idx = llvm::ConstantInt::getIntegerValue(intType, llvm::APInt(32, -1, true));
 
@@ -1773,9 +1842,8 @@ void Parser::RelationTypeCheck(Symbol expectedType, Symbol term, Symbol relation
             llvmBuilder->CreateBr(strCmpStart);
             llvmBuilder->SetInsertPoint(strCmpStart);
 
-            llvm::Value *one = llvm::ConstantInt::getIntegerValue(intType, oneAPInt);
             idx = llvmBuilder->CreateLoad(intType, idxAddr);
-            idx = llvmBuilder->CreateBinOp(llvm::Instruction::Add, idx, one);
+            idx = llvmBuilder->CreateBinOp(llvm::Instruction::Add, idx, llvm::ConstantInt::getIntegerValue(intType, oneAPInt));
             llvmBuilder->CreateStore(idx, idxAddr);
 
             // ******* This block works *******
@@ -1783,21 +1851,18 @@ void Parser::RelationTypeCheck(Symbol expectedType, Symbol term, Symbol relation
             // This revealed that I was attempting to load an i8* using the result of GEP, when this should
             // in fact have just loaded an i8. Much time was wasted.
             //
-            // Get address of the idx'th element in each string
-            auto lhsAddress = llvmBuilder->CreateGEP(term.GetLLVMValue(), idx);
-            auto rhsAddress = llvmBuilder->CreateGEP(relation_.GetLLVMValue(), idx);
-
             // Get character at 'idx' from each string, you have to create the load with i8 and not i8*
             // as i found out after 2 weeks of trying to fix string comparison.
-            llvm::Value *lhsCharacter = llvmBuilder->CreateLoad(llvmBuilder->getInt8Ty(), lhsAddress);
-            llvm::Value *rhsCharacter = llvmBuilder->CreateLoad(llvmBuilder->getInt8Ty(), rhsAddress);
+            llvm::IntegerType *int8Ty = llvmBuilder->getInt8Ty();
+            llvm::Value *lhsCharacter = llvmBuilder->CreateLoad(int8Ty, llvmBuilder->CreateGEP(term.GetLLVMValue(), idx));
+            llvm::Value *rhsCharacter = llvmBuilder->CreateLoad(int8Ty, llvmBuilder->CreateGEP(relation_.GetLLVMValue(), idx));
 
-            // compare the first character of lhs and rhs
+            // compare (==) the first character of lhs and rhs
             llvm::Value *stringComparison = llvmBuilder->CreateICmpEQ(lhsCharacter, rhsCharacter);
             // ******* This block works *******
 
             // escCh = '\0'
-            llvm::Value *escCh = llvm::ConstantInt::getIntegerValue(llvmBuilder->getInt8Ty(), llvm::APInt(8, 0, true));
+            llvm::Value *escCh = llvm::ConstantInt::getIntegerValue(int8Ty, llvm::APInt(8, 0, true));
             llvm::Value *notDone = llvmBuilder->CreateICmpNE(lhsCharacter, escCh);
 
             // Prev char's match and prev lhsChar was not esc char '\0', then continue
@@ -1925,7 +1990,7 @@ void Parser::Term(Symbol expectedType, Symbol &out)
     Symbol term_ = Symbol();
     Term_(expectedType, term_);
 
-    ArithOpTypeCheck(expectedType, factor, term_, op, out);
+    ValidateArithOp(expectedType, factor, term_, op, out);
     return;
 }
 
@@ -1940,7 +2005,7 @@ void Parser::Term_(Symbol expectedType, Symbol &out)
         Symbol term_ = Symbol();
         Term_(expectedType, term_);
 
-        ArithOpTypeCheck(expectedType, factor, term_, op, out);
+        ValidateArithOp(expectedType, factor, term_, op, out);
         return;
     }
 
@@ -1969,7 +2034,7 @@ void Parser::Factor(Symbol expectedType, Symbol &out)
     }
     else if (ValidateToken(T_IDENTIFIER))
     {
-        ProcedureCallOrName(sym);
+        Identifiers(sym);
     }
     else if (ValidateToken(T_SUBTRACT))
     {
@@ -1979,7 +2044,7 @@ void Parser::Factor(Symbol expectedType, Symbol &out)
         }
         else if (ValidateToken(T_IDENTIFIER))
         {
-            ProcedureCallOrName(sym);
+            Identifiers(sym);
         }
         else
         {
@@ -2001,7 +2066,9 @@ void Parser::Factor(Symbol expectedType, Symbol &out)
         }
         else
         {
-            ReportTypeMismatchError("int/float", TypeToString(sym.GetType()));
+            std::string errorStr = "Expected: int/float\n";
+            errorStr += "\tActual: " + TypeToString(sym.GetType())+ "\n";
+            ReportError(errorStr);
         }
 
 
@@ -2043,7 +2110,7 @@ void Parser::Factor(Symbol expectedType, Symbol &out)
 
 // Combines <procedure_call> and <name> because both are <identifier>'s. The two are then differentiated here and
 // the appropriate course of action is taken for each.
-void Parser::ProcedureCallOrName(Symbol &out)
+void Parser::Identifiers(Symbol &out)
 {
     Symbol sym = Symbol();
     std::string id = token->val.stringValue;
@@ -2082,9 +2149,7 @@ void Parser::ProcedureCallOrName(Symbol &out)
             tmp->type == T_STRING_LITERAL || tmp->type == T_TRUE ||
             tmp->type == T_FALSE)
         {
-            auto paramStart = procSym.GetParameters().begin();
-            auto paramEnd = procSym.GetParameters().end();
-            std::vector<llvm::Value *> arguments = ArgumentList(paramStart, paramEnd);
+            std::vector<llvm::Value *> arguments = ArgumentList(procSym.GetParameters());
             llvm::Value *val = llvmBuilder->CreateCall(procSym.GetLLVMFunction(), arguments);
             sym.SetLLVMValue(val);
         }
@@ -2138,7 +2203,7 @@ void Parser::ProcedureCallOrName(Symbol &out)
                 return;
             }
 
-            IndexArray(sym, sym);
+            IndexArray(sym);
         }
         else if (doUnroll)
         {
@@ -2166,15 +2231,14 @@ void Parser::ProcedureCallOrName(Symbol &out)
                     llvm::IntegerType *intType = llvmBuilder->getInt32Ty();
                     llvm::APInt zeroAPInt = llvm::APInt(32, 0, true);
                     llvm::Value *zero = llvm::ConstantInt::getIntegerValue(intType, zeroAPInt);
-                    llvm::Value *vals[] = {zero, unrollIdx};
-                    addr = llvmBuilder->CreateInBoundsGEP(sym.GetLLVMArrayAddress(), vals);
+                    addr = llvmBuilder->CreateInBoundsGEP(sym.GetArrayAddress(), {zero, unrollIdx});
                 }
                 else
                 {
-                    addr = llvmBuilder->CreateGEP(sym.GetLLVMArrayAddress(), unrollIdx);
+                    addr = llvmBuilder->CreateGEP(sym.GetArrayAddress(), unrollIdx);
                 }
 
-                sym.SetLLVMAddress(addr);
+                sym.SetAddress(addr);
             }
         }
         else
@@ -2194,7 +2258,7 @@ void Parser::ProcedureCallOrName(Symbol &out)
             }
 
             // Load value
-            llvm::Value *val = llvmBuilder->CreateLoad(GetLLVMType(sym), sym.GetLLVMAddress());
+            llvm::Value *val = llvmBuilder->CreateLoad(GetLLVMType(sym), sym.GetAddress());
             sym.SetLLVMValue(val);
         }
     }
@@ -2231,108 +2295,16 @@ void Parser::Number(Symbol &out)
 // <string>
 void Parser::String(Symbol &out)
 {
-    Symbol sym = Symbol();
+    out = Symbol();
     if (token->type != T_STRING_LITERAL)
     {
         ReportError("String literal expected.");
-        out.CopySymbol(sym);
         return;
     }
 
-    sym.SetType(T_STRING);
+    out.SetType(T_STRING);
     llvm::Value *val = llvmBuilder->CreateGlobalStringPtr(token->val.stringValue);
-    sym.SetLLVMValue(val);
-
-    out.CopySymbol(sym);
-    return;
-}
-
-// <argument_list>
-std::vector<llvm::Value *> Parser::ArgumentList(std::vector<Symbol>::iterator curr, std::vector<Symbol>::iterator end)
-{
-    bool continue_ = true;
-    std::vector<llvm::Value *> arguments;
-    while (continue_)
-    {
-        continue_ = false;
-
-        if (curr == end)
-        {
-            // No more args
-            ReportError("Too many arguments");
-            return arguments;
-        }
-
-        // Make sure the type matches what is expected
-        Symbol expr = Symbol();
-        Expression(*curr, expr);
-        AssignmentTypeCheck(*curr, expr, token, expr);
-
-        if (curr->IsArray())
-        {
-            if (curr->GetArraySize() != expr.GetArraySize() || expr.IsArrayIndexed())
-            {
-                ReportError("Array expected as argument");
-                return arguments;
-            }
-        }
-        else if (expr.IsArray() && !expr.IsArrayIndexed())
-        {
-            ReportError("Invalid argument: Cannot pass un-indexed array");
-            return arguments;
-        }
-
-        if (!expr.IsValid())
-        {
-            return arguments;
-        }
-
-        // add to arg vector
-        if (expr.IsArray() && !expr.IsArrayIndexed())
-        {
-            if (expr.IsGlobal())
-            {
-                // Global arrays are weird
-                llvm::IntegerType *intType = llvmBuilder->getInt32Ty();
-                llvm::APInt zeroAPInt = llvm::APInt(32, 0, true);
-                llvm::Value *zero = llvm::ConstantInt::getIntegerValue(intType, zeroAPInt);
-                llvm::Value *val = llvmBuilder->CreateInBoundsGEP(expr.GetLLVMArrayAddress(), zero);
-                val = llvmBuilder->CreateBitCast(val, GetLLVMType(expr)->getPointerTo());
-                arguments.push_back(val);
-            }
-            else
-            {
-                arguments.push_back(expr.GetLLVMValue());
-            }
-        }
-        else
-        {
-            arguments.push_back(expr.GetLLVMValue());
-        }
-
-        // but wait, there's more
-        if (ValidateToken(T_COMMA))
-        {
-            continue_ = true;
-            curr = std::next(curr);
-        }
-        else
-        {
-            if (curr != end)
-            {
-                if (std::next(curr) != end)
-                {
-                    ReportError("Not enough arguments");
-                    return arguments;
-                }
-            }
-
-            continue_ = false;
-        }
-    }
-
-
-    return arguments;
+    out.SetLLVMValue(val);
 }
 
 // Helper function to get the corresponding llvm type from the symbol
