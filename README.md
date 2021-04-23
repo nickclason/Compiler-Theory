@@ -12,8 +12,7 @@ In have tested this project on both Mac OS and Ubuntu 20.04.
 
 To set up the correct environment based on a default Linux installation, the following steps were taken:
 1. sudo apt install clang llvm
-2. sudo apt install gcc
-3. sudo apt install make
+2. sudo apt install make
 
 This should handle all dependencies.
 - - - -
@@ -28,7 +27,7 @@ make
 
 Then to link the runtime with the generated code run: 
 
-gcc output.o src/runtime.c -lm
+clang output.o src/runtime.c -lm
 
 Run the executable:
 ./a.out 
@@ -63,11 +62,19 @@ Once constructed, the parser will begin parsing/scanning, and take care of every
 ### General Notes
 * Important note: when running ./compiler, I have encountered an error message 
   
-`error() double free`
+```
+free(): double free detected in tcache 2
+Aborted (core dumped)  
+```
+However I have not ran into any issues and have not been able to track down the source of this. There error is a result
+of something trying to be freed that already has been freed. Regardless, the IR and .o file are generated and should be
+fine to link with the runtime. For purposes of compiling and running, this error can be ignored.
 * Resyncronization is attempted in 2 places, in \<declaration> and \<statement>. If the parser successfully
 recovers, parsing will attempt to continue. In the cases of [test1.src](testPgms/incorrect/test1.src) and
   [test1b.src](testPgms/incorrect/test1b.src), the parser is able to recover and continue parsing, and the
-  IR generated is usable and runs with no issues.
+  IR generated is usable and runs with no issues. This is definitely something I could improve, and I think if I better
+  understood the purpose of trying to resync, I would be able to do this in a better manner. Currently though I don't
+  really see the point in trying to recover from these errors.
   
 * Leaving off the '.' after 'end program' will issue a warning, but the code will be considered valid
 and will be compiled and can still be ran.
