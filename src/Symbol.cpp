@@ -15,10 +15,10 @@ Symbol::Symbol() {
     isValid = true;
     isIndexed = false;
     address = nullptr;
-    llvmValue = nullptr;
+    value = nullptr;
     arrayAddress = nullptr;
     llvmArraySize = nullptr;
-    llvmFunction = nullptr;
+    function = nullptr;
 }
 
 Symbol::~Symbol() {
@@ -113,12 +113,12 @@ void Symbol::SetAddress(llvm::Value *address) {
     Symbol::address = address;
 }
 
-llvm::Value *Symbol::GetLLVMValue() const {
-    return llvmValue;
+llvm::Value *Symbol::GetValue() const {
+    return value;
 }
 
-void Symbol::SetLLVMValue(llvm::Value *llvmValue) {
-    Symbol::llvmValue = llvmValue;
+void Symbol::SetValue(llvm::Value *value) {
+    Symbol::value = value;
 }
 
 llvm::Value *Symbol::GetArrayAddress() const {
@@ -137,12 +137,12 @@ void Symbol::SetLLVMArraySize(llvm::Value *llvmArraySize) {
     Symbol::llvmArraySize = llvmArraySize;
 }
 
-llvm::Function *Symbol::GetLLVMFunction() const {
-    return llvmFunction;
+llvm::Function *Symbol::GetFunction() const {
+    return function;
 }
 
-void Symbol::SetLLVMFunction(llvm::Function *llvmFunction) {
-    Symbol::llvmFunction = llvmFunction;
+void Symbol::SetFunction(llvm::Function *function) {
+    Symbol::function = function;
 }
 
 void Symbol::CopySymbol(Symbol toCopy)
@@ -160,8 +160,8 @@ void Symbol::CopySymbol(Symbol toCopy)
     this->SetIsArrayIndexed(toCopy.IsArrayIndexed());
     this->SetAddress(toCopy.GetAddress());
     this->SetArrayAddress(toCopy.GetArrayAddress());
-    this->SetLLVMValue(toCopy.GetLLVMValue());
+    this->SetValue(toCopy.GetValue());
     this->SetLLVMArraySize(toCopy.GetLLVMArraySize());
-    this->SetLLVMFunction(toCopy.GetLLVMFunction());
+    this->SetFunction(toCopy.GetFunction());
     this->SetParameters(toCopy.GetParameters());
 }

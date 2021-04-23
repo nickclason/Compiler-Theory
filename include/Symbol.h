@@ -52,8 +52,8 @@ public:
     llvm::Value *GetAddress() const;
     void SetAddress(llvm::Value *address);
 
-    llvm::Value *GetLLVMValue() const;
-    void SetLLVMValue(llvm::Value *llvmValue);
+    llvm::Value *GetValue() const;
+    void SetValue(llvm::Value *value);
 
     llvm::Value *GetArrayAddress() const;
     void SetArrayAddress(llvm::Value *arrayAddress);
@@ -61,8 +61,8 @@ public:
     llvm::Value *GetLLVMArraySize() const;
     void SetLLVMArraySize(llvm::Value *llvmArraySize);
 
-    llvm::Function *GetLLVMFunction() const;
-    void SetLLVMFunction(llvm::Function *llvmFunction);
+    llvm::Function *GetFunction() const;
+    void SetFunction(llvm::Function *function) ;
 
     void CopySymbol(Symbol toCopy);
 
@@ -84,10 +84,10 @@ private:
 
     // LLVM
     llvm::Value *address;
-    llvm::Value *llvmValue;
+    llvm::Value *value;
     llvm::Value *arrayAddress;
     llvm::Value *llvmArraySize;
-    llvm::Function *llvmFunction;
+    llvm::Function *function;
 };
 
 #endif //COMPILER_THEORY_SYMBOL_H

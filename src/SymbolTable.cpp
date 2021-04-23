@@ -180,7 +180,7 @@ void SymbolTable::AddIOFunctions(llvm::Module *llvmModule, llvm::IRBuilder<> *ll
     oobError.SetDeclarationType(T_PROCEDURE);
     type = llvm::FunctionType::get(llvmBuilder->getVoidTy(), {}, false);
     procedure = llvm::Function::Create(type, llvm::Function::ExternalLinkage, oobError.GetId(), llvmModule);
-    oobError.SetLLVMFunction(procedure);
+    oobError.SetFunction(procedure);
     AddSymbol(oobError);
 }
 
@@ -211,7 +211,7 @@ Symbol SymbolTable::GeneratePutSymbol(std::string id, int type, Symbol args, llv
         llvmType = llvm::FunctionType::get(llvmBuilder->getInt1Ty(), llvmArgType, false);
     }
     llvm::Function *procedure = llvm::Function::Create(llvmType, llvm::Function::ExternalLinkage, put.GetId(), llvmModule);
-    put.SetLLVMFunction(procedure);
+    put.SetFunction(procedure);
 
     return put;
 }
@@ -226,7 +226,7 @@ Symbol SymbolTable::GenerateGetSymbol(std::string id, int type, llvm::Module *ll
     get.SetDeclarationType(T_PROCEDURE);
     llvm::FunctionType *llvmType = llvm::FunctionType::get(llvmTy, {},false);
     llvm::Function *procedure = llvm::Function::Create(llvmType, llvm::Function::ExternalLinkage, get.GetId(), llvmModule);
-    get.SetLLVMFunction(procedure);
+    get.SetFunction(procedure);
 
     return get;
 }

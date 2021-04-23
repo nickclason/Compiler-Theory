@@ -515,7 +515,7 @@ void Parser::ProcedureDeclaration(Symbol &procedure)
     procedureCount++;
 
     auto *func = llvm::cast<llvm::Function>(proc);
-    procedure.SetLLVMFunction(func);
+    procedure.SetFunction(func);
 
     // Don't add if it already exists
     std::string checkID = procedure.GetId();
@@ -650,7 +650,7 @@ std::vector<llvm::Value *> Parser::ArgumentList(std::vector<Symbol> &arguments_)
         }
         else
         {
-            arguments.push_back(expr.GetLLVMValue());
+            arguments.push_back(expr.GetValue());
         }
 
         // but wait, there's more
@@ -688,7 +688,7 @@ void Parser::ProcedureBody()
     Symbol currProc = symbolTable.GetScopeProc();
 
     // Create entry block
-    llvmCurrProc = currProc.GetLLVMFunction();
+    llvmCurrProc = currProc.GetFunction();
     llvmBuilder->SetInsertPoint(CreateBasicBlock("entry"));
 
     // Create all local variables
@@ -740,7 +740,7 @@ void Parser::ProcedureBody()
             llvmBuilder->CreateStore(argVal, newSymbol.GetAddress());
         }
 
-        newSymbol.SetLLVMValue(argVal);
+        newSymbol.SetValue(argVal);
         newSymbol.SetIsInitialized(true);
         symbolTable.AddSymbol(newSymbol);
     }
@@ -923,8 +923,8 @@ void Parser::AssignmentStatement()
     if (!expr.IsValid()) { return; }
 
     // Store expression in the destination
-    llvmBuilder->CreateStore(expr.GetLLVMValue(), dest.GetAddress());
-    dest.SetLLVMValue(expr.GetLLVMValue());
+    llvmBuilder->CreateStore(expr.GetValue(), dest.GetAddress());
+    dest.SetValue(expr.GetValue());
 
     if (doUnroll)
     {
@@ -963,8 +963,8 @@ void Parser::IfStatement()
     if (expr.GetType() == T_INTEGER)
     {
         ReportWarning("Converting integer to boolean");
-        llvm::Value *val = llvmBuilder->CreateICmpNE(expr.GetLLVMValue(), CreateConstantInt(32, 0, llvmBuilder->getInt32Ty()));
-        expr.SetLLVMValue(val);
+        llvm::Value *val = llvmBuilder->CreateICmpNE(expr.GetValue(), CreateConstantInt(32, 0, llvmBuilder->getInt32Ty()));
+        expr.SetValue(val);
     }
     else if (expr.GetType() != T_BOOL)
     {
@@ -990,7 +990,7 @@ void Parser::IfStatement()
     llvm::BasicBlock *endBlock = nullptr;
 
     // Conditional jump that is based on the expression
-    llvmBuilder->CreateCondBr(expr.GetLLVMValue(), ifBlock, elseBlock);
+    llvmBuilder->CreateCondBr(expr.GetValue(), ifBlock, elseBlock);
     llvmBuilder->SetInsertPoint(ifBlock);
 
     // if block statements
@@ -1091,8 +1091,8 @@ void Parser::LoopStatement()
     if (expr.GetType() == T_INTEGER)
     {
         ReportWarning("Converting integer to boolean");
-        llvm::Value *val = llvmBuilder->CreateICmpNE(expr.GetLLVMValue(), CreateConstantInt(32, 0, llvmBuilder->getInt32Ty()));
-        expr.SetLLVMValue(val);
+        llvm::Value *val = llvmBuilder->CreateICmpNE(expr.GetValue(), CreateConstantInt(32, 0, llvmBuilder->getInt32Ty()));
+        expr.SetValue(val);
     }
     else if (expr.GetType() != T_BOOL)
     {
@@ -1107,7 +1107,7 @@ void Parser::LoopStatement()
     }
 
     // Jump to body or end based on expression
-    llvmBuilder->CreateCondBr(expr.GetLLVMValue(), loopBody, loopEnd);
+    llvmBuilder->CreateCondBr(expr.GetValue(), loopBody, loopEnd);
     llvmBuilder->SetInsertPoint(loopBody);
 
     // Get all statements
@@ -1167,7 +1167,7 @@ void Parser::ReturnStatement()
     }
 
     // Create return
-    llvmBuilder->CreateRet(expr.GetLLVMValue());
+    llvmBuilder->CreateRet(expr.GetValue());
 }
 
 // Index the symbol passed in
@@ -1210,8 +1210,8 @@ void Parser::IndexArray(Symbol &symbol)
         llvm::Value *address = nullptr;
 
         // Create check for array bounds
-        llvm::Value *lowerBound = llvmBuilder->CreateICmpSLT(idx.GetLLVMValue(), symbol.GetLLVMArraySize());
-        llvm::Value *upperBound = llvmBuilder->CreateICmpSGE(idx.GetLLVMValue(), CreateConstantInt(32, 0, intType));
+        llvm::Value *lowerBound = llvmBuilder->CreateICmpSLT(idx.GetValue(), symbol.GetLLVMArraySize());
+        llvm::Value *upperBound = llvmBuilder->CreateICmpSGE(idx.GetValue(), CreateConstantInt(32, 0, intType));
         llvm::Value *checkVal = llvmBuilder->CreateAnd(upperBound, lowerBound);
 
         llvm::BasicBlock *oob = CreateBasicBlock("oob");
@@ -1225,18 +1225,18 @@ void Parser::IndexArray(Symbol &symbol)
         // and theres no way to tell the size at this point
         //  i.e. variable x : integer[2]
         //       x[100] := 1; this syntax is still valid in the eyes of the parser
-        auto oobError = symbolTable.FindSymbol("OOB_ERROR").GetLLVMFunction(); // safe because i add this myself
+        auto oobError = symbolTable.FindSymbol("OOB_ERROR").GetFunction(); // safe because i add this myself
         llvmBuilder->CreateCall(oobError);
         llvmBuilder->CreateBr(validIdx);
         llvmBuilder->SetInsertPoint(validIdx);
 
         if (symbol.IsGlobal())
         {
-            address = llvmBuilder->CreateInBoundsGEP(symbol.GetArrayAddress(), {CreateConstantInt(32, 0, intType), idx.GetLLVMValue()});
+            address = llvmBuilder->CreateInBoundsGEP(symbol.GetArrayAddress(), {CreateConstantInt(32, 0, intType), idx.GetValue()});
         }
         else
         {
-            address = llvmBuilder->CreateGEP(symbol.GetArrayAddress(), idx.GetLLVMValue());
+            address = llvmBuilder->CreateGEP(symbol.GetArrayAddress(), idx.GetValue());
         }
 
         symbol.SetAddress(address);
@@ -1267,8 +1267,8 @@ void Parser::ValidateAssignment(Symbol lhs, Symbol &rhs)
         isDiff = false;
         rhs.SetType(T_BOOL);
         ReportWarning("Converting int to bool");
-        llvm::Value *val = llvmBuilder->CreateICmpNE(rhs.GetLLVMValue(), CreateConstantInt(32, 0, intType));
-        rhs.SetLLVMValue(val);
+        llvm::Value *val = llvmBuilder->CreateICmpNE(rhs.GetValue(), CreateConstantInt(32, 0, intType));
+        rhs.SetValue(val);
     }
 
     if (lhs.GetType() == T_INTEGER)
@@ -1280,16 +1280,16 @@ void Parser::ValidateAssignment(Symbol lhs, Symbol &rhs)
             rhs.SetType(T_INTEGER);
             isDiff = false;
             ReportWarning("Converting bool to int");
-            llvm::Value *val = llvmBuilder->CreateZExtOrTrunc(rhs.GetLLVMValue(), intType);
-            rhs.SetLLVMValue(val);
+            llvm::Value *val = llvmBuilder->CreateZExtOrTrunc(rhs.GetValue(), intType);
+            rhs.SetValue(val);
         }
         else if (rhs.GetType() == T_FLOAT) // float -> int
         {
             rhs.SetType(T_INTEGER);
             isDiff = false;
             ReportWarning("Converting float to int");
-            llvm::Value *val = llvmBuilder->CreateFPToSI(rhs.GetLLVMValue(), intType);
-            rhs.SetLLVMValue(val);
+            llvm::Value *val = llvmBuilder->CreateFPToSI(rhs.GetValue(), intType);
+            rhs.SetValue(val);
         }
     }
 
@@ -1299,8 +1299,8 @@ void Parser::ValidateAssignment(Symbol lhs, Symbol &rhs)
         isDiff = false;
         ReportWarning("Converting int to float");
         rhs.SetType(T_FLOAT);
-        llvm::Value *val = llvmBuilder->CreateSIToFP(rhs.GetLLVMValue(), llvmBuilder->getFloatTy());
-        rhs.SetLLVMValue(val);
+        llvm::Value *val = llvmBuilder->CreateSIToFP(rhs.GetValue(), llvmBuilder->getFloatTy());
+        rhs.SetValue(val);
     }
 
     // If we get here, no suitable conversion was found and the types do not match, nor are they interoperable
@@ -1474,8 +1474,8 @@ void Parser::ValidateExpression(Symbol expectedType, Symbol arithOp, Symbol expr
 
         // Create the appropriate operation
         llvm::Value *val;
-        llvm::Value *arithVal = arithOp.GetLLVMValue();
-        llvm::Value *exprVal = expr_.GetLLVMValue();
+        llvm::Value *arithVal = arithOp.GetValue();
+        llvm::Value *exprVal = expr_.GetValue();
         switch (op->type)
         {
             case T_AND:
@@ -1488,13 +1488,13 @@ void Parser::ValidateExpression(Symbol expectedType, Symbol arithOp, Symbol expr
                 printf("No operation found");
         }
 
-        sym.SetLLVMValue(val);
+        sym.SetValue(val);
 
         // Create Not operation if one should exist
         if (isNotOp)
         {
-            val = llvmBuilder->CreateNot(sym.GetLLVMValue());
-            sym.SetLLVMValue(val);
+            val = llvmBuilder->CreateNot(sym.GetValue());
+            sym.SetValue(val);
         }
         out.CopySymbol(sym);
         return;
@@ -1529,8 +1529,8 @@ void Parser::ValidateExpression(Symbol expectedType, Symbol arithOp, Symbol expr
             }
 
             // Create Not operation
-            llvm::Value *val = llvmBuilder->CreateNot(arithOp.GetLLVMValue());
-            arithOp.SetLLVMValue(val);
+            llvm::Value *val = llvmBuilder->CreateNot(arithOp.GetValue());
+            arithOp.SetValue(val);
         }
 
         // expr_ was not valid, return arithOp
@@ -1589,16 +1589,16 @@ void Parser::ValidateArithOp(Symbol expectedType, Symbol rel, Symbol arithOp_, t
                 if (isInterop && arithOp_.GetType() == T_FLOAT)
                 {
                     // do type conversion
-                    llvm::Value *val = llvmBuilder->CreateSIToFP(rel.GetLLVMValue(), llvmBuilder->getFloatTy());
-                    rel.SetLLVMValue(val);
+                    llvm::Value *val = llvmBuilder->CreateSIToFP(rel.GetValue(), llvmBuilder->getFloatTy());
+                    rel.SetValue(val);
                 }
                 break;
             case T_FLOAT:
                 isInterop = (arithOp_.GetType() == T_INTEGER || arithOp_.GetType() == T_FLOAT);
                 if (isInterop && arithOp_.GetType() == T_INTEGER)
                 {
-                    llvm::Value *val = llvmBuilder->CreateSIToFP(arithOp_.GetLLVMValue(), llvmBuilder->getFloatTy());
-                    arithOp_.SetLLVMValue(val);
+                    llvm::Value *val = llvmBuilder->CreateSIToFP(arithOp_.GetValue(), llvmBuilder->getFloatTy());
+                    arithOp_.SetValue(val);
                 }
                 break;
             default:
@@ -1620,8 +1620,8 @@ void Parser::ValidateArithOp(Symbol expectedType, Symbol rel, Symbol arithOp_, t
         {
             case T_ADD:
             {
-                auto relVal = rel.GetLLVMValue();
-                auto arithVal = arithOp_.GetLLVMValue();
+                auto relVal = rel.GetValue();
+                auto arithVal = arithOp_.GetValue();
                 if (isFloatOp) {
                     val = llvmBuilder->CreateBinOp(llvm::Instruction::FAdd, relVal, arithVal);
                 } else {
@@ -1631,8 +1631,8 @@ void Parser::ValidateArithOp(Symbol expectedType, Symbol rel, Symbol arithOp_, t
             }
             case T_SUBTRACT:
             {
-                auto relVal = rel.GetLLVMValue();
-                auto arithVal = arithOp_.GetLLVMValue();
+                auto relVal = rel.GetValue();
+                auto arithVal = arithOp_.GetValue();
                 if (isFloatOp)
                 {
                     val = llvmBuilder->CreateBinOp(llvm::Instruction::FSub, relVal, arithVal);
@@ -1645,8 +1645,8 @@ void Parser::ValidateArithOp(Symbol expectedType, Symbol rel, Symbol arithOp_, t
             }
             case T_MULTIPLY:
             {
-                auto relVal = rel.GetLLVMValue();
-                auto arithVal = arithOp_.GetLLVMValue();
+                auto relVal = rel.GetValue();
+                auto arithVal = arithOp_.GetValue();
                 if (isFloatOp)
                 {
                     val = llvmBuilder->CreateBinOp(llvm::Instruction::FMul, relVal, arithVal);
@@ -1659,8 +1659,8 @@ void Parser::ValidateArithOp(Symbol expectedType, Symbol rel, Symbol arithOp_, t
             }
             case T_DIVIDE:
             {
-                auto relVal = rel.GetLLVMValue();
-                auto arithVal = arithOp_.GetLLVMValue();
+                auto relVal = rel.GetValue();
+                auto arithVal = arithOp_.GetValue();
                 if (isFloatOp)
                 {
                     val = llvmBuilder->CreateBinOp(llvm::Instruction::FDiv, relVal, arithVal);
@@ -1675,7 +1675,7 @@ void Parser::ValidateArithOp(Symbol expectedType, Symbol rel, Symbol arithOp_, t
                 std::cout << "Could not find an operation" << std::endl;
         }
 
-        sym.SetLLVMValue(val);
+        sym.SetValue(val);
 
         int expTy = expectedType.GetType();
         switch (expTy)
@@ -1685,16 +1685,16 @@ void Parser::ValidateArithOp(Symbol expectedType, Symbol rel, Symbol arithOp_, t
                 sym.SetType(T_FLOAT);
                 if (!isFloatOp)
                 {
-                    llvm::Value *val = llvmBuilder->CreateSIToFP(sym.GetLLVMValue(), llvmBuilder->getFloatTy());
-                    sym.SetLLVMValue(val);
+                    llvm::Value *val = llvmBuilder->CreateSIToFP(sym.GetValue(), llvmBuilder->getFloatTy());
+                    sym.SetValue(val);
                 }
                 break;
             case T_INTEGER:
                 sym.SetType(T_INTEGER);
                 if (isFloatOp)
                 {
-                    llvm::Value *val = llvmBuilder->CreateSIToFP(sym.GetLLVMValue(), llvmBuilder->getInt32Ty());
-                    sym.SetLLVMValue(val);
+                    llvm::Value *val = llvmBuilder->CreateSIToFP(sym.GetValue(), llvmBuilder->getInt32Ty());
+                    sym.SetValue(val);
                 }
                 break;
             default:
@@ -1773,8 +1773,8 @@ void Parser::ValidateRelation(Symbol expectedType, Symbol term, Symbol relation_
                 isInterop = (relation_.GetType() == T_BOOL || relation_.GetType() == T_INTEGER);
                 if (isInterop && relation_.GetType() == T_INTEGER)
                 {
-                    llvm::Value *val = llvmBuilder->CreateZExtOrTrunc(term.GetLLVMValue(), llvmBuilder->getInt32Ty());
-                    term.SetLLVMValue(val);
+                    llvm::Value *val = llvmBuilder->CreateZExtOrTrunc(term.GetValue(), llvmBuilder->getInt32Ty());
+                    term.SetValue(val);
                 }
                 break;
             case T_FLOAT:
@@ -1782,8 +1782,8 @@ void Parser::ValidateRelation(Symbol expectedType, Symbol term, Symbol relation_
                 isInterop = (relation_.GetType() == T_FLOAT || relation_.GetType() == T_INTEGER);
                 if (isInterop && relation_.GetType() == T_INTEGER)
                 {
-                    llvm::Value *val = llvmBuilder->CreateSIToFP(relation_.GetLLVMValue(), llvmBuilder->getFloatTy());
-                    relation_.SetLLVMValue(val);
+                    llvm::Value *val = llvmBuilder->CreateSIToFP(relation_.GetValue(), llvmBuilder->getFloatTy());
+                    relation_.SetValue(val);
                 }
                 break;
             case T_INTEGER:
@@ -1792,13 +1792,13 @@ void Parser::ValidateRelation(Symbol expectedType, Symbol term, Symbol relation_
                 {
                     if (relation_.GetType() == T_BOOL)
                     {
-                        llvm::Value *val = llvmBuilder->CreateZExtOrTrunc(relation_.GetLLVMValue(), llvmBuilder->getInt32Ty());
-                        relation_.SetLLVMValue(val);
+                        llvm::Value *val = llvmBuilder->CreateZExtOrTrunc(relation_.GetValue(), llvmBuilder->getInt32Ty());
+                        relation_.SetValue(val);
                     }
                     else if (relation_.GetType() == T_FLOAT)
                     {
-                        llvm::Value *val = llvmBuilder->CreateSIToFP(term.GetLLVMValue(), llvmBuilder->getFloatTy());
-                        term.SetLLVMValue(val);
+                        llvm::Value *val = llvmBuilder->CreateSIToFP(term.GetValue(), llvmBuilder->getFloatTy());
+                        term.SetValue(val);
                         isFloatOp = true;
                     }
                 }
@@ -1851,8 +1851,8 @@ void Parser::ValidateRelation(Symbol expectedType, Symbol term, Symbol relation_
             // Get character at 'idx' from each string, you have to create the load with i8 and not i8*
             // as i found out after 2 weeks of trying to fix string comparison.
             llvm::IntegerType *int8Ty = llvmBuilder->getInt8Ty();
-            llvm::Value *lhsCharacter = llvmBuilder->CreateLoad(int8Ty, llvmBuilder->CreateGEP(term.GetLLVMValue(), idx));
-            llvm::Value *rhsCharacter = llvmBuilder->CreateLoad(int8Ty, llvmBuilder->CreateGEP(relation_.GetLLVMValue(), idx));
+            llvm::Value *lhsCharacter = llvmBuilder->CreateLoad(int8Ty, llvmBuilder->CreateGEP(term.GetValue(), idx));
+            llvm::Value *rhsCharacter = llvmBuilder->CreateLoad(int8Ty, llvmBuilder->CreateGEP(relation_.GetValue(), idx));
 
             // compare (==) the first character of lhs and rhs
             llvm::Value *stringComparison = llvmBuilder->CreateICmpEQ(lhsCharacter, rhsCharacter);
@@ -1879,84 +1879,84 @@ void Parser::ValidateRelation(Symbol expectedType, Symbol term, Symbol relation_
                 case T_LESSTHAN:
                     if (isFloatOp)
                     {
-                        auto termVal = term.GetLLVMValue();
-                        auto relVal = relation_.GetLLVMValue();
+                        auto termVal = term.GetValue();
+                        auto relVal = relation_.GetValue();
                         val = llvmBuilder->CreateFCmpOLT(termVal, relVal);
                     }
                     else
                     {
-                        auto termVal = term.GetLLVMValue();
-                        auto relVal = relation_.GetLLVMValue();
+                        auto termVal = term.GetValue();
+                        auto relVal = relation_.GetValue();
                         val = llvmBuilder->CreateICmpSLT(termVal, relVal);
                     }
                     break;
                 case T_LTEQ:
                     if (isFloatOp)
                     {
-                        auto termVal = term.GetLLVMValue();
-                        auto relVal = relation_.GetLLVMValue();
+                        auto termVal = term.GetValue();
+                        auto relVal = relation_.GetValue();
                         val = llvmBuilder->CreateFCmpOLE(termVal, relVal);
                     }
                     else
                     {
-                        auto termVal = term.GetLLVMValue();
-                        auto relVal = relation_.GetLLVMValue();
+                        auto termVal = term.GetValue();
+                        auto relVal = relation_.GetValue();
                         val = llvmBuilder->CreateICmpSLE(termVal, relVal);
                     }
                     break;
                 case T_GREATERTHAN:
                     if (isFloatOp)
                     {
-                        auto termVal = term.GetLLVMValue();
-                        auto relVal = relation_.GetLLVMValue();
+                        auto termVal = term.GetValue();
+                        auto relVal = relation_.GetValue();
                         val = llvmBuilder->CreateFCmpOGT(termVal, relVal);
                     }
                     else
                     {
-                        auto termVal = term.GetLLVMValue();
-                        auto relVal = relation_.GetLLVMValue();
+                        auto termVal = term.GetValue();
+                        auto relVal = relation_.GetValue();
                         val = llvmBuilder->CreateICmpSGT(termVal, relVal);
                     }
                     break;
                 case T_GTEQ:
                     if (isFloatOp)
                     {
-                        auto termVal = term.GetLLVMValue();
-                        auto relVal = relation_.GetLLVMValue();
+                        auto termVal = term.GetValue();
+                        auto relVal = relation_.GetValue();
                         val = llvmBuilder->CreateFCmpOGE(termVal, relVal);
                     }
                     else
                     {
-                        auto termVal = term.GetLLVMValue();
-                        auto relVal = relation_.GetLLVMValue();
+                        auto termVal = term.GetValue();
+                        auto relVal = relation_.GetValue();
                         val = llvmBuilder->CreateICmpSGE(termVal, relVal);
                     }
                     break;
                 case T_EQEQ:
                     if (isFloatOp)
                     {
-                        auto termVal = term.GetLLVMValue();
-                        auto relVal = relation_.GetLLVMValue();
+                        auto termVal = term.GetValue();
+                        auto relVal = relation_.GetValue();
                         val = llvmBuilder->CreateFCmpOEQ(termVal, relVal);
                     }
                     else
                     {
-                        auto termVal = term.GetLLVMValue();
-                        auto relVal = relation_.GetLLVMValue();
+                        auto termVal = term.GetValue();
+                        auto relVal = relation_.GetValue();
                         val = llvmBuilder->CreateICmpEQ(termVal, relVal);
                     }
                     break;
                 case T_NOTEQ:
                     if (isFloatOp)
                     {
-                        auto termVal = term.GetLLVMValue();
-                        auto relVal = relation_.GetLLVMValue();
+                        auto termVal = term.GetValue();
+                        auto relVal = relation_.GetValue();
                         val = llvmBuilder->CreateFCmpONE(termVal, relVal);
                     }
                     else
                     {
-                        auto termVal = term.GetLLVMValue();
-                        auto relVal = relation_.GetLLVMValue();
+                        auto termVal = term.GetValue();
+                        auto relVal = relation_.GetValue();
                         val = llvmBuilder->CreateICmpNE(termVal, relVal);
                     }
                     break;
@@ -1965,7 +1965,7 @@ void Parser::ValidateRelation(Symbol expectedType, Symbol term, Symbol relation_
             }
         }
 
-        sym.SetLLVMValue(val);
+        sym.SetValue(val);
         sym.SetType(T_BOOL);
 
         out.CopySymbol(sym);
@@ -2053,13 +2053,13 @@ void Parser::Factor(Symbol expectedType, Symbol &out)
 
         if (sym.GetType() == T_INTEGER)
         {
-            llvm::Value *val = llvmBuilder->CreateNeg(sym.GetLLVMValue());
-            sym.SetLLVMValue(val);
+            llvm::Value *val = llvmBuilder->CreateNeg(sym.GetValue());
+            sym.SetValue(val);
         }
         else if (sym.GetType() == T_FLOAT)
         {
-            llvm::Value *val = llvmBuilder->CreateFNeg(sym.GetLLVMValue());
-            sym.SetLLVMValue(val);
+            llvm::Value *val = llvmBuilder->CreateFNeg(sym.GetValue());
+            sym.SetValue(val);
         }
         else
         {
@@ -2081,12 +2081,12 @@ void Parser::Factor(Symbol expectedType, Symbol &out)
     else if (ValidateToken(T_TRUE))
     {
         sym.SetType(T_BOOL);
-        sym.SetLLVMValue(CreateConstantInt(1, 1, GetLLVMType(sym)));
+        sym.SetValue(CreateConstantInt(1, 1, GetLLVMType(sym)));
     }
     else if (ValidateToken(T_FALSE))
     {
         sym.SetType(T_BOOL);
-        sym.SetLLVMValue(CreateConstantInt(1, 0, GetLLVMType(sym)));
+        sym.SetValue(CreateConstantInt(1, 0, GetLLVMType(sym)));
     }
     else
     {
@@ -2142,8 +2142,8 @@ void Parser::Identifiers(Symbol &out)
             tmp->type == T_FALSE)
         {
             std::vector<llvm::Value *> arguments = ArgumentList(procSym.GetParameters());
-            llvm::Value *val = llvmBuilder->CreateCall(procSym.GetLLVMFunction(), arguments);
-            sym.SetLLVMValue(val);
+            llvm::Value *val = llvmBuilder->CreateCall(procSym.GetFunction(), arguments);
+            sym.SetValue(val);
         }
         else
         {
@@ -2157,8 +2157,8 @@ void Parser::Identifiers(Symbol &out)
                 return;
             }
 
-            llvm::Value *val = llvmBuilder->CreateCall(procSym.GetLLVMFunction());
-            sym.SetLLVMValue(val);
+            llvm::Value *val = llvmBuilder->CreateCall(procSym.GetFunction());
+            sym.SetValue(val);
         }
 
         if (!ValidateToken(T_RPAREN))
@@ -2249,7 +2249,7 @@ void Parser::Identifiers(Symbol &out)
 
             // Load value
             llvm::Value *val = llvmBuilder->CreateLoad(GetLLVMType(sym), sym.GetAddress());
-            sym.SetLLVMValue(val);
+            sym.SetValue(val);
         }
     }
 
@@ -2275,7 +2275,7 @@ void Parser::Number(Symbol &out)
         val = llvm::ConstantFP::get(GetLLVMType(sym), llvm::APFloat(token->val.floatValue));
     }
 
-    sym.SetLLVMValue(val);
+    sym.SetValue(val);
 
     out.CopySymbol(sym);
     return;
@@ -2293,7 +2293,7 @@ void Parser::String(Symbol &out)
 
     out.SetType(T_STRING);
     llvm::Value *val = llvmBuilder->CreateGlobalStringPtr(token->val.stringValue);
-    out.SetLLVMValue(val);
+    out.SetValue(val);
 }
 
 // Helper function to get the corresponding llvm type from the symbol
