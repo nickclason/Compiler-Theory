@@ -71,7 +71,7 @@ int main(int argc, char* argv[])
     token_t *token = new token_t();
 
 
-    Parser *p = new Parser(scanner, symbolTable, token);
+    Parser p(scanner, symbolTable, token);
 
     return 0;
 }

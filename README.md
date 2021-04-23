@@ -2,10 +2,8 @@
 Compiler for EECE 5183/6083
 - - - -
 ## Requirements
-
-* clang++
-* gcc
-* llvm 11.1.0
+* llvm 
+* clang/clang++ (min 10.0.0)
 * make
 - - - -
 ## Build Instructions
@@ -15,11 +13,11 @@ make
 - - - -
 ## How to use
 ```
-./output/compiler <file_name>
+./compiler <file_name>
 
 Then to link the runtime with the generated code run: 
 
-gcc output/output.o src/runtime.c 
+gcc output.o src/runtime.c -lm
 
 Run the executable:
 ./a.out 

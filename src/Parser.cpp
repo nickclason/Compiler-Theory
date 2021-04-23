@@ -71,7 +71,7 @@ Parser::Parser(Scanner scanner_, SymbolTable symbolTable_, token_t *token_)
     if ((!errorFlag && errorCount == 0) || sucessfulResync)
     {
         // Compile
-        std::string outFile = "output/IR.ll";
+        std::string outFile = "IR.ll";
         std::error_code error_code;
         llvm::raw_fd_ostream out(outFile, error_code, llvm::sys::fs::F_None);
         llvmModule->print(out, nullptr);
@@ -103,7 +103,7 @@ Parser::Parser(Scanner scanner_, SymbolTable symbolTable_, token_t *token_)
         llvmModule->setDataLayout(TargetMachine->createDataLayout());
         llvmModule->setTargetTriple(TargetTriple);
 
-        auto Filename = "output/output.o";
+        auto Filename = "output.o";
         std::error_code EC;
         llvm::raw_fd_ostream dest(Filename, EC, llvm::sys::fs::OF_None);
 
