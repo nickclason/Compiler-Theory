@@ -3,8 +3,19 @@ Compiler for EECE 5183/6083
 - - - -
 ## Requirements
 * llvm 
-* clang/clang++ (min 10.0.0)
+* clang/clang++
 * make
+- - - -
+
+## Setup Environment
+In have tested this project on both Mac OS and Ubuntu 20.04.
+
+To set up the correct environment based on a default Linux installation, the following steps were taken:
+1. sudo apt install clang llvm
+2. sudo apt install gcc
+3. sudo apt install make
+
+This should handle all dependencies.
 - - - -
 ## Build Instructions
 ```
@@ -50,6 +61,9 @@ by the user. This is due to how I track scope and could likely be easily fixed, 
 Once constructed, the parser will begin parsing/scanning, and take care of everything from there.
 
 ### General Notes
+* Important note: when running ./compiler, I have encountered an error message 
+  
+`error() double free`
 * Resyncronization is attempted in 2 places, in \<declaration> and \<statement>. If the parser successfully
 recovers, parsing will attempt to continue. In the cases of [test1.src](testPgms/incorrect/test1.src) and
   [test1b.src](testPgms/incorrect/test1b.src), the parser is able to recover and continue parsing, and the
