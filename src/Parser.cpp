@@ -2,7 +2,6 @@
 // Created by Nick Clason on 2/1/21.
 //
 
-
 #include "../include/Parser.h"
 
 #include <fstream>
@@ -332,7 +331,8 @@ void Parser::Declarations()
         {
             // TODO: resync i don't get the point of this if there is an error, then there is likely
             //       to be further errors down the line, so it seems kind of pointless to continue. Especially
-            //       consider that we are basically just ignoring a valid error
+            //       consider that we are basically just ignoring a valid error but we are able to obtain resynchronization,
+            //       for test1.src and test1b.src
 //            std::cout << token->type << std::endl;
             if (DoResync(true))
             {
@@ -843,7 +843,8 @@ void Parser::Statements(bool singleTerminator)
 
         if (errorFlag)
         {
-            // TODO: RE: resync i don't get the point of this
+            // TODO: RE: resync i don't get the point of this, but we are able to obtain resynchronization,
+            //       for test1.src and test1b.src
             if (DoResync(false))
             {
                 Statements(singleTerminator);
