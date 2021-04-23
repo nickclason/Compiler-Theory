@@ -204,6 +204,11 @@ void Parser::ProgramBody()
         return;
     }
 
+    if (!ValidateToken(T_PERIOD))
+    {
+        ReportWarning("Missing '.' after 'end program'.");
+    }
+
     // Always return an integer (0), because according to the way the language is defined, you can have a return
     // statement in the program body but we don't really want to do anything with it.
     llvmBuilder->CreateRet(CreateConstantInt(32, 0, intType));

@@ -36,5 +36,17 @@ This is a single pass, LL(1) recursive descent parser, which is meant to parse t
 [projectLanugage.pdf](projectLanguage.pdf). There are 2 resync points to attempt to recover from a
 parsing error.
 
-### Interesting Features
-* Tracks unused variables
+
+### Features
+* Track errors and reports the number of errors with detailed error messages including line and column numbers.
+* Track warnings and reports the number of warnings with line and column number of warning location.
+
+### Notes
+* Resyncronization is attempted in 2 places, in <declaration> and <statement>. If the parser successfully
+recovers, parsing will attempt to continue. In the cases of [test1.src](testPgms/incorrect/test1.src) and
+  [test1b.src](testPgms/incorrect/test1b.src), the parser is able to recover and continue parsing, and the
+  IR generated is usable and runs with no issues.
+  
+* Leaving off the '.' after 'end program' will issue a warning, but the code will be considered valid
+and will be compiled and can still be ran.
+
