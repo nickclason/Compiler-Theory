@@ -42,7 +42,7 @@ parsing error.
 
 ### Design Notes
 * Symbol table/scoping is accomplished via std::map. There are 2 "scopes" (global/local). The global
-scope is a single std::map, and the local scopes is constructed with a std::vector<std::map>.
+scope is a single std::map, and the local scopes is constructed with a std::vector\<std::map>.
 
 * As a result of the way I designed scope management, the built-in get/put IO functions CAN be overridden
 by the user. This is due to how I track scope and could likely be easily fixed, but given the time constraint
@@ -52,7 +52,7 @@ by the user. This is due to how I track scope and could likely be easily fixed, 
 Once constructed, the parser will begin parsing/scanning, and take care of everything from there.
 
 ### General Notes
-* Resyncronization is attempted in 2 places, in <declaration> and <statement>. If the parser successfully
+* Resyncronization is attempted in 2 places, in \<declaration> and \<statement>. If the parser successfully
 recovers, parsing will attempt to continue. In the cases of [test1.src](testPgms/incorrect/test1.src) and
   [test1b.src](testPgms/incorrect/test1b.src), the parser is able to recover and continue parsing, and the
   IR generated is usable and runs with no issues.
