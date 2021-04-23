@@ -187,8 +187,7 @@ void Parser::ProgramBody()
     llvmCurrProc = llvm::cast<llvm::Function>(main);
 
     // First block is named entry, following llvm kaleidoscope tutorial
-    llvm::BasicBlock *entry = llvm::BasicBlock::Create(llvmContext, "entry", llvmCurrProc);
-    llvmBuilder->SetInsertPoint(entry);
+    llvmBuilder->SetInsertPoint(CreateBasicBlock("entry"));
 
     // Get all statements
     Statements(true);
@@ -636,20 +635,13 @@ std::vector<llvm::Value *> Parser::ArgumentList(std::vector<Symbol> &arguments_)
         }
 
         // add to arg vector
-        bool addArrayArg = (expr.IsArray() && !expr.IsArrayIndexed());
+        bool addArrayArg = (expr.IsArray() && !expr.IsArrayIndexed() && expr.IsGlobal());
         if (addArrayArg)
         {
-            if (expr.IsGlobal())
-            {
-                llvm::IntegerType *intType = llvmBuilder->getInt32Ty();
-                llvm::Value *val = llvmBuilder->CreateInBoundsGEP(expr.GetArrayAddress(), CreateConstantInt(32, 0, intType));
-                val = llvmBuilder->CreateBitCast(val, GetLLVMType(expr)->getPointerTo());
-                arguments.push_back(val);
-            }
-            else
-            {
-                arguments.push_back(expr.GetLLVMValue());
-            }
+            llvm::IntegerType *intType = llvmBuilder->getInt32Ty();
+            llvm::Value *val = llvmBuilder->CreateInBoundsGEP(expr.GetArrayAddress(), CreateConstantInt(32, 0, intType));
+            val = llvmBuilder->CreateBitCast(val, GetLLVMType(expr)->getPointerTo());
+            arguments.push_back(val);
         }
         else
         {
@@ -691,8 +683,8 @@ void Parser::ProcedureBody()
     Symbol currProc = symbolTable.GetScopeProc();
 
     // Create entry block
-    llvm::BasicBlock *entry = llvm::BasicBlock::Create(llvmContext, "entry", llvmCurrProc = currProc.GetLLVMFunction());
-    llvmBuilder->SetInsertPoint(entry);
+    llvmCurrProc = currProc.GetLLVMFunction();
+    llvmBuilder->SetInsertPoint(CreateBasicBlock("entry"));
 
     // Create all local variables
     std::map<std::string, Symbol>::iterator it;
@@ -987,8 +979,8 @@ void Parser::IfStatement()
     }
 
     // Create blocks for "if then" and "else"
-    llvm::BasicBlock *ifBlock = llvm::BasicBlock::Create(llvmContext, "if", llvmCurrProc);
-    llvm::BasicBlock *elseBlock = llvm::BasicBlock::Create(llvmContext, "else", llvmCurrProc);;
+    llvm::BasicBlock *ifBlock = CreateBasicBlock("if");
+    llvm::BasicBlock *elseBlock = CreateBasicBlock("else");
     llvm::BasicBlock *endBlock = nullptr;
 
     // Conditional jump that is based on the expression
@@ -1000,7 +992,7 @@ void Parser::IfStatement()
 
     if (token->type == T_ELSE)
     {
-        endBlock = llvm::BasicBlock::Create(llvmContext, "endIf", llvmCurrProc);
+        endBlock = CreateBasicBlock("endIf");
         if (llvmBuilder->GetInsertBlock()->getTerminator() != nullptr)
         {
             llvmBuilder->SetInsertPoint(elseBlock);
@@ -1075,9 +1067,9 @@ void Parser::LoopStatement()
         return;
     }
 
-    llvm::BasicBlock *loopStart = llvm::BasicBlock::Create(llvmContext, "loopStart", llvmCurrProc);
-    llvm::BasicBlock *loopBody = llvm::BasicBlock::Create(llvmContext, "loopBody", llvmCurrProc); // (<statement>;)*
-    llvm::BasicBlock *loopEnd = llvm::BasicBlock::Create(llvmContext,"loopEnd", llvmCurrProc);
+    llvm::BasicBlock *loopStart = CreateBasicBlock("loopStart");
+    llvm::BasicBlock *loopBody = CreateBasicBlock("loopBody"); // (<statement>;)*
+    llvm::BasicBlock *loopEnd = CreateBasicBlock("loopEnd");
 
     // jump to start
     llvmBuilder->CreateBr(loopStart);
@@ -1216,8 +1208,8 @@ void Parser::IndexArray(Symbol &symbol)
         llvm::Value *upperBound = llvmBuilder->CreateICmpSGE(idx.GetLLVMValue(), CreateConstantInt(32, 0, intType));
         llvm::Value *checkVal = llvmBuilder->CreateAnd(upperBound, lowerBound);
 
-        llvm::BasicBlock *oob = llvm::BasicBlock::Create(llvmContext, "oob", llvmCurrProc);
-        llvm::BasicBlock *validIdx = llvm::BasicBlock::Create(llvmContext, "validIdx", llvmCurrProc);
+        llvm::BasicBlock *oob = CreateBasicBlock("oob");
+        llvm::BasicBlock *validIdx = CreateBasicBlock("validIdx");
 
         llvmBuilder->CreateCondBr(checkVal, validIdx, oob);
         llvmBuilder->SetInsertPoint(oob);
@@ -1364,9 +1356,9 @@ Symbol Parser::Destination()
             llvmBuilder->CreateStore(unrollIdx, unrollIdxAddress);
 
             // Blocks for unrolling loop
-            unrollLoopStart = llvm::BasicBlock::Create(llvmContext, "unrollLoopStart", llvmCurrProc);
-            llvm::BasicBlock *unrollLoopBody = llvm::BasicBlock::Create(llvmContext, "unrollLoopBody", llvmCurrProc);
-            unrollLoopEnd = llvm::BasicBlock::Create(llvmContext, "unrollLoopEnd", llvmCurrProc);
+            unrollLoopStart = CreateBasicBlock("unrollLoopStart");
+            llvm::BasicBlock *unrollLoopBody = CreateBasicBlock("unrollLoopBody");
+            unrollLoopEnd = CreateBasicBlock("unrollLoopEnd");
 
             // Jump to the loop start and load index
             llvmBuilder->CreateBr(unrollLoopStart);
@@ -1834,8 +1826,8 @@ void Parser::ValidateRelation(Symbol expectedType, Symbol term, Symbol relation_
 
             llvmBuilder->CreateStore(idx, idxAddr);
 
-            llvm::BasicBlock *strCmpStart = llvm::BasicBlock::Create(llvmContext, "strCmpStart", llvmCurrProc);
-            llvm::BasicBlock *strCmpEnd = llvm::BasicBlock::Create(llvmContext, "strCmpEnd", llvmCurrProc);
+            llvm::BasicBlock *strCmpStart = CreateBasicBlock("strCmpStart");
+            llvm::BasicBlock *strCmpEnd = CreateBasicBlock("strCmpEnd");
 
             // jump to the loop start
             llvmBuilder->CreateBr(strCmpStart);
@@ -2372,4 +2364,10 @@ llvm::Value *Parser::CreateConstantInt(int numBits, int intVal, llvm::Type *type
 {
     llvm::APInt intValue = llvm::APInt(numBits, intVal, true);
     return llvm::ConstantInt::getIntegerValue(type, intValue);
+}
+
+// Helper function for quickly creating llvm::BasicBlock
+llvm::BasicBlock *Parser::CreateBasicBlock(std::string name)
+{
+    return llvm::BasicBlock::Create(llvmContext, name , llvmCurrProc);
 }

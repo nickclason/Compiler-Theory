@@ -111,7 +111,7 @@ private:
 
     llvm::Type* GetLLVMType(Symbol symbol);
     llvm::Value* CreateConstantInt(int numBits, int intVal, llvm::Type *type);
-
+    llvm::BasicBlock* CreateBasicBlock(std::string name);
 
 };
 
